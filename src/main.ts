@@ -6,416 +6,253 @@ import * as DAT from 'dat.gui';
 import ShaderProgram, { Shader } from './rendering/gl/ShaderProgram';
 import { setGL } from './globals';
 
-	let scene = new FlipFluidScene();
-	let fluid : FlipFluid; 
-	let simHeight: number;;	
-	let cScale: number;
-	let simWidth: number;
-	let canvas: HTMLCanvasElement;
-	let gl: WebGL2RenderingContext;
+let scene = new FlipFluidScene();
+let fluid : FlipFluid; 
+let simHeight: number;;	
+let cScale: number;
+let simWidth: number;
+let canvas: HTMLCanvasElement;
+let gl: WebGL2RenderingContext;
 
-	let resolutionChanged = false;
+let resolutionChanged = false;
+let oldResolution: number = 100; 
+let currResolution: number = 100; 
 
-	// GUI controls 
-	const controls = {
-	'Load Scene': setupScene, // A function pointer, essentially
-	'Obstacle radius' : 0.1,
-	'Resolution' : 100,
-	'Gravity': -9.81,
-	// 'Streamlines': true,
-	'Speed Display': false,
-	'Density Display': true,
-	'Particle': true,
-	'Grid': false,
-	'Compensate Drift': true,
-	'Separate Particles': true,
-	'PIC - FLIP Ratio': 0.9,
-	'Fluid color' : [0, 0, 255, 1],
-	'Play simulation': false, 
-	// 'Play simulation': toggleStart,
-	};
+// GUI controls 
+const controls = {
+'Load Scene': setupScene, // A function pointer, essentially
+'Obstacle radius' : 0.1,
+'Resolution' : 100,
+'Gravity': -9.81,
+// 'Streamlines': true,
+'Speed Display': false,
+'Density Display': true,
+'Particle': true,
+'Grid': false,
+'Compensate Drift': true,
+'Separate Particles': true,
+'PIC - FLIP Ratio': 0.9,
+'Fluid color' : [0, 0, 255, 1],
+'Play simulation': false, 
+// 'Play simulation': toggleStart,
+};
 
-	// Set up the GUI
-	let gui = new DAT.GUI();
-	// Add controls to the gui
-	gui.add(controls, 'Load Scene');
-	gui.add(controls, 'Obstacle radius', 0.05, 0.2).step(0.005);   
-	// when resolution changes, make resolutionChanged true and call setupScene
-	gui.add(controls, 'Resolution', 10, 200).step(10).onChange(() => { resolutionChanged = true; setupScene();});
-	gui.add(controls, 'Gravity', -15.00, -8.0).step(0.01);
-	gui.add(controls, 'Speed Display');
-	gui.add(controls, 'Density Display');
-	gui.add(controls, 'Particle');
-	gui.add(controls, 'Grid');
-	gui.add(controls, 'Compensate Drift');
-	gui.add(controls, 'Separate Particles');
-	gui.add(controls, 'PIC - FLIP Ratio', 0.0, 1.0).step(0.1);
-	gui.addColor(controls, 'Fluid color'); 
-	gui.add(controls, 'Play simulation');
+// Set up the GUI
+let gui = new DAT.GUI();
+// Add controls to the gui
+gui.add(controls, 'Load Scene');
+gui.add(controls, 'Obstacle radius', 0.05, 0.2).step(0.005);   
+gui.add(controls, 'Resolution', 10, 200).step(10).onChange(() => { 
+	oldResolution = currResolution; 		// store previous resolution
+	currResolution = controls['Resolution']; // store previous resolution 
+	resolutionChanged = true; 				// set resolutionChanged to true
+	setupScene();});						// call setupScene
+gui.add(controls, 'Gravity', -15.00, -8.0).step(0.01);
+gui.add(controls, 'Speed Display');
+gui.add(controls, 'Density Display');
+gui.add(controls, 'Particle');
+gui.add(controls, 'Grid');
+gui.add(controls, 'Compensate Drift');
+gui.add(controls, 'Separate Particles');
+gui.add(controls, 'PIC - FLIP Ratio', 0.0, 1.0).step(0.1);
+gui.addColor(controls, 'Fluid color'); 
+gui.add(controls, 'Play simulation');
+
+
+// -------- Buffers for drawing --------------------- 
+var pointVertexBuffer: WebGLBuffer | null = null;
+var pointColorBuffer: WebGLBuffer | null = null;
+
+var gridVertBuffer: WebGLBuffer | null = null;
+var gridColorBuffer: WebGLBuffer | null = null;
+
+var obstacleVertBuffer: WebGLBuffer | null = null;
+var obstacleIdBuffer: WebGLBuffer | null = null;
+
+// --------------------------------------------------------------
+
+function resetGl() {
+	// clear gl/reset viewport 
+	gl.clearColor(0.0, 0.0, 0.0, 1.0);
+	gl.clear(gl.COLOR_BUFFER_BIT);
+	gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+}
+
+function resetAndClear() {
+	// clear gl/reset viewport 
+	resetGl(); 
 	
-	
+	// delete buffers 
+	pointVertexBuffer = null;
+	pointColorBuffer = null;
+	gridVertBuffer = null;
+	gridColorBuffer = null;
+	obstacleVertBuffer = null;
+	obstacleIdBuffer = null;
+}
 
-	// -------- Buffers for drawing --------------------- 
-	var pointVertexBuffer: WebGLBuffer | null = null;
-	var pointColorBuffer: WebGLBuffer | null = null;
+function setObstacle(x: number, y: number, reset: boolean) {
+	var vx = 0.0;
+	var vy = 0.0;
 
-	var gridVertBuffer: WebGLBuffer | null = null;
-	var gridColorBuffer: WebGLBuffer | null = null;
-
-	var obstacleVertBuffer: WebGLBuffer | null = null;
-	var obstacleIdBuffer: WebGLBuffer | null = null;
-
-	// --------------------------------------------------------------
-
-	function resetGl() {
-		// clear gl/reset viewport 
-		gl.clearColor(0.0, 0.0, 0.0, 1.0);
-		gl.clear(gl.COLOR_BUFFER_BIT);
-		gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+	if (!reset) {
+		vx = (x - scene.obstacleX) / scene.dt;
+		vy = (y - scene.obstacleY) / scene.dt;
 	}
 
-	function resetAndClear() {
-		// clear gl/reset viewport 
-		resetGl(); 
-		
-		// delete buffers 
-		pointVertexBuffer = null;
-		pointColorBuffer = null;
-		gridVertBuffer = null;
-		gridColorBuffer = null;
-		obstacleVertBuffer = null;
-		obstacleIdBuffer = null;
-	}
+	if (resolutionChanged) {
+		resolutionChanged = false; 
 
-		
+		// --------------------------------------------------------------
+		// Calculate the resolution change factor
+		var resolutionFactor = oldResolution / currResolution;
+
+		// Calculate the new obstacle position based on the resolution change factor
+		scene.obstacleX *= resolutionFactor;
+		scene.obstacleY *= resolutionFactor;
+		// scene.obstacleRadius *= resolutionFactor;		 
+
+		// --------------------------------------------------------------
+		var r = scene.obstacleRadius;
+		var f = fluid;
+		var n = f.fNumY;
+		var cd = Math.sqrt(2) * f.h;
 	
-
-	// --------------------------------------------------------------
-
-	// function setObstacle(x: number, y: number, reset: boolean) {
-
-	// 	var vx = 0.0;
-	// 	var vy = 0.0;
-
-	// 	if (!reset) {
-	// 		vx = (x - scene.obstacleX) / scene.dt;
-	// 		vy = (y - scene.obstacleY) / scene.dt;
-	// 	}
-
-	// 	scene.obstacleX = x;
-	// 	scene.obstacleY = y;
-	// 	var r = scene.obstacleRadius;
-	// 	var f = fluid;
-	// 	var n = f.fNumY;
-	// 	var cd = Math.sqrt(2) * f.h;
-
-	// 	for (var i = 1; i < f.fNumX-2; i++) {
-	// 		for (var j = 1; j < f.fNumY-2; j++) {
-
-	// 			f.s[i*n + j] = 1.0;
-
-	// 			var dx = (i + 0.5) * f.h - x;
-	// 			var dy = (j + 0.5) * f.h - y;
-
-	// 			if (dx * dx + dy * dy < r * r) {
-	// 				f.s[i*n + j] = 0.0;
-	// 				f.u[i*n + j] = vx;
-	// 				f.u[(i+1)*n + j] = vx;
-	// 				f.v[i*n + j] = vy;
-	// 				f.v[i*n + j+1] = vy;
-	// 			}
-	// 		}
-	// 	}
-		
-	// 	scene.showObstacle = true;
-	// 	scene.obstacleVelX = vx;
-	// 	scene.obstacleVelY = vy;
-	// }
-
-	// --------------------------------------------- WORKING 
-	function setObstacle(x: number, y: number, reset: boolean) {
-		var vx = 0.0;
-		var vy = 0.0;
+		for (var i = 1; i < f.fNumX - 2; i++) {
+			for (var j = 1; j < f.fNumY - 2; j++) {
+				f.s[i * n + j] = 1.0;
 	
-		if (!reset) {
-			vx = (x - scene.obstacleX) / scene.dt;
-			vy = (y - scene.obstacleY) / scene.dt;
-		}
-
-		if (resolutionChanged) {
-			resolutionChanged = false; 
-			// Define a fixed reference resolution
-			var refResolution = 100;
-		
-			// Calculate the obstacle position and size based on the reference resolution
-			var refObstacleX = 30.0;
-			var refObstacleY = 20.0;
-			var refObstacleRadius = 0.1;
-		
-			var scaleX = refObstacleRadius * refResolution / controls['Resolution'];
-			var scaleY = scaleX;
-		
-			scene.obstacleX = refObstacleX * scaleX;
-			scene.obstacleY = refObstacleY * scaleY;
-			scene.obstacleRadius = refObstacleRadius * scaleX;
-
-			console.log('obstacle x if res changed: ', scene.obstacleX);
-			console.log('obstacle y if res changed: ', scene.obstacleY);
-			
-		
-			var r = scene.obstacleRadius;
-			var f = fluid;
-			var n = f.fNumY;
-			var cd = Math.sqrt(2) * f.h;
-		
-			for (var i = 1; i < f.fNumX - 2; i++) {
-				for (var j = 1; j < f.fNumY - 2; j++) {
-					f.s[i * n + j] = 1.0;
-		
-					var dx = (i + 0.5) * f.h - scene.obstacleX;
-					var dy = (j + 0.5) * f.h - scene.obstacleY;
-		
-					if (dx * dx + dy * dy < r * r) {
-						f.s[i * n + j] = 0.0;
-						f.u[i * n + j] = vx;
-						f.u[(i + 1) * n + j] = vx;
-						f.v[i * n + j] = vy;
-						f.v[i * n + j + 1] = vy;
-					}
+				var dx = (i + 0.5) * f.h - scene.obstacleX;
+				var dy = (j + 0.5) * f.h - scene.obstacleY;
+	
+				if (dx * dx + dy * dy < r * r) {
+					f.s[i * n + j] = 0.0;
+					f.u[i * n + j] = vx;
+					f.u[(i + 1) * n + j] = vx;
+					f.v[i * n + j] = vy;
+					f.v[i * n + j + 1] = vy;
 				}
 			}
-		
-			scene.showObstacle = true;
-			scene.obstacleVelX = vx;
-			scene.obstacleVelY = vy;
+		}
+	
+		scene.showObstacle = true;
+		scene.obstacleVelX = vx;
+		scene.obstacleVelY = vy;			
+	} else {
+		scene.obstacleX = x;
+		scene.obstacleY = y;
 
-			console.log('obstacle velx if res changed: ', scene.obstacleVelX);
-			console.log('obstacle vely if res changed: ', scene.obstacleVelY);
-			
-		} else {
-			scene.obstacleX = x;
-			scene.obstacleY = y;
-			console.log('obstacle x: ', scene.obstacleX);
-			console.log('obstacle y: ', scene.obstacleY);
+		var r = scene.obstacleRadius;
+		var f = fluid;
+		var n = f.fNumY;
+		var cd = Math.sqrt(2) * f.h;
 
-			var r = scene.obstacleRadius;
-			var f = fluid;
-			var n = f.fNumY;
-			var cd = Math.sqrt(2) * f.h;
+		for (var i = 1; i < f.fNumX-2; i++) {
+			for (var j = 1; j < f.fNumY-2; j++) {
 
-			for (var i = 1; i < f.fNumX-2; i++) {
-				for (var j = 1; j < f.fNumY-2; j++) {
+				f.s[i*n + j] = 1.0;
 
-					f.s[i*n + j] = 1.0;
+				var dx = (i + 0.5) * f.h - x;
+				var dy = (j + 0.5) * f.h - y;
 
-					var dx = (i + 0.5) * f.h - x;
-					var dy = (j + 0.5) * f.h - y;
-
-					if (dx * dx + dy * dy < r * r) {
-						f.s[i*n + j] = 0.0;
-						f.u[i*n + j] = vx;
-						f.u[(i+1)*n + j] = vx;
-						f.v[i*n + j] = vy;
-						f.v[i*n + j+1] = vy;
-					}
+				if (dx * dx + dy * dy < r * r) {
+					f.s[i*n + j] = 0.0;
+					f.u[i*n + j] = vx;
+					f.u[(i+1)*n + j] = vx;
+					f.v[i*n + j] = vy;
+					f.v[i*n + j+1] = vy;
 				}
 			}
-			
-			scene.showObstacle = true;
-			scene.obstacleVelX = vx;
-			scene.obstacleVelY = vy;
-			// log obstacle velx and vely
-			console.log('obstacle velx: ', scene.obstacleVelX);
-			console.log('obstacle vely: ', scene.obstacleVelY);
 		}
-	
 		
+		scene.showObstacle = true;
+		scene.obstacleVelX = vx;
+		scene.obstacleVelY = vy;
+	}	
+}
+
+
+function setupScene() 
+{
+	// stop simulation 
+	controls['Play simulation'] = false;
+
+	resetAndClear(); // Clear the canvas and reset the buffers
+
+	gui.updateDisplay();
+
+	scene.obstacleRadius = controls['Obstacle radius'];
+	scene.overRelaxation = 1.9;
+
+	scene.dt = 1.0 / 60.0;
+	scene.numPressureIters = 50;
+	scene.numParticleIters = 2;
+
+	// var res = 100;
+	var res = controls['Resolution'];
+	scene.gravity = controls['Gravity'];
+
+	// Calculate simHeight based on the ratio of the current resolution to the base resolution
+	let baseResolution = 100;
+
+	simHeight = 3.0 * (baseResolution / res);
+	cScale = canvas.height / simHeight;
+	simWidth = canvas.width / cScale;
+
+
+	// need to adjusting for resolution
+	// Adjust simHeight based on the resolution
+	// simHeight = 3.0 * (res / 100);
+	var tankHeight = 1.0 * simHeight;
+	var tankWidth = 1.0 * simWidth;
+	var h = tankHeight / (res);
+
+	var density = 1000.0;
+
+	var relWaterHeight = 0.8
+	var relWaterWidth = 0.6
+
+	// dam break
+	// compute number of particles
+
+	var r = 0.3 * h;	// particle radius w.r.t. cell size
+	var dx = 2.0 * r;
+	var dy = Math.sqrt(3.0) / 2.0 * dx;
+
+	var numX = Math.floor((relWaterWidth * tankWidth - 2.0 * h - 2.0 * r) / dx);
+	var numY = Math.floor((relWaterHeight * tankHeight - 2.0 * h - 2.0 * r) / dy);
+	var maxParticles = numX * numY;		
+
+	// create fluid
+	fluid = new FlipFluid(density, tankWidth, tankHeight, h, r, maxParticles);
+
+	// create particles
+	fluid.numParticles = numX * numY;
+	
+	var p = 0;
+	for (var i = 0; i < numX; i++) {
+		for (var j = 0; j < numY; j++) {
+			fluid.particlePos[p++] = h + r + dx * i + (j % 2 == 0 ? 0.0 : r);
+			fluid.particlePos[p++] = h + r + dy * j
+		}
 	}
-	
 
-	
-	// function setObstacle(x: number, y: number, reset: boolean) {
-	// 	var vx = 0.0;
-	// 	var vy = 0.0;
-	
-	// 	if (!reset) {
-	// 		vx = (x - scene.obstacleX) / scene.dt;
-	// 		vy = (y - scene.obstacleY) / scene.dt;
-	// 	}
+	// setup grid cells for tank
+	var n = fluid.fNumY;
 
-	// 	if (resolutionChanged) {
-	// 		resolutionChanged = false; 
-	// 		// Define a fixed reference resolution
-	// 		var refResolution = 100;
-		
-	// 		// Calculate the obstacle position and size based on the reference resolution
-	// 		var refObstacleX = scene.obstacleX;
-	// 		var refObstacleY = scene.obstacleY;
-	// 		var refObstacleRadius = 0.1;
-		
-	// 		var scaleX = refObstacleRadius * refResolution / controls['Resolution'];
-	// 		var scaleY = scaleX;
-		
-	// 		// scene.obstacleX = refObstacleX * scaleX;
-	// 		// scene.obstacleY = refObstacleY * scaleY;
-	// 		// scene.obstacleRadius = refObstacleRadius * scaleX;
-
-	// 		scene.obstacleX = scene.obstacleX * refResolution / controls['Resolution'];
-	// 		scene.obstacleY = scene.obstacleY * refResolution / controls['Resolution'];
-
-	// 		console.log('obstacle x if res changed: ', scene.obstacleX);
-	// 		console.log('obstacle y if res changed: ', scene.obstacleY);
-			
-		
-	// 		var r = scene.obstacleRadius;
-	// 		var f = fluid;
-	// 		var n = f.fNumY;
-	// 		var cd = Math.sqrt(2) * f.h;
-		
-	// 		for (var i = 1; i < f.fNumX - 2; i++) {
-	// 			for (var j = 1; j < f.fNumY - 2; j++) {
-	// 				f.s[i * n + j] = 1.0;
-		
-	// 				var dx = (i + 0.5) * f.h - scene.obstacleX;
-	// 				var dy = (j + 0.5) * f.h - scene.obstacleY;
-		
-	// 				if (dx * dx + dy * dy < r * r) {
-	// 					f.s[i * n + j] = 0.0;
-	// 					f.u[i * n + j] = vx;
-	// 					f.u[(i + 1) * n + j] = vx;
-	// 					f.v[i * n + j] = vy;
-	// 					f.v[i * n + j + 1] = vy;
-	// 				}
-	// 			}
-	// 		}
-		
-	// 		scene.showObstacle = true;
-	// 		scene.obstacleVelX = vx;
-	// 		scene.obstacleVelY = vy;
-
-	// 		console.log('obstacle velx if res changed: ', scene.obstacleVelX);
-	// 		console.log('obstacle vely if res changed: ', scene.obstacleVelY);
-			
-	// 	} else {
-	// 		scene.obstacleX = x;
-	// 		scene.obstacleY = y;
-	// 		console.log('obstacle x: ', scene.obstacleX);
-	// 		console.log('obstacle y: ', scene.obstacleY);
-
-	// 		var r = scene.obstacleRadius;
-	// 		var f = fluid;
-	// 		var n = f.fNumY;
-	// 		var cd = Math.sqrt(2) * f.h;
-
-	// 		for (var i = 1; i < f.fNumX-2; i++) {
-	// 			for (var j = 1; j < f.fNumY-2; j++) {
-
-	// 				f.s[i*n + j] = 1.0;
-
-	// 				var dx = (i + 0.5) * f.h - x;
-	// 				var dy = (j + 0.5) * f.h - y;
-
-	// 				if (dx * dx + dy * dy < r * r) {
-	// 					f.s[i*n + j] = 0.0;
-	// 					f.u[i*n + j] = vx;
-	// 					f.u[(i+1)*n + j] = vx;
-	// 					f.v[i*n + j] = vy;
-	// 					f.v[i*n + j+1] = vy;
-	// 				}
-	// 			}
-	// 		}
-			
-	// 		scene.showObstacle = true;
-	// 		scene.obstacleVelX = vx;
-	// 		scene.obstacleVelY = vy;
-	// 		// log obstacle velx and vely
-	// 		console.log('obstacle velx: ', scene.obstacleVelX);
-	// 		console.log('obstacle vely: ', scene.obstacleVelY);
-	// 	}
-	
-		
-	// }
-
-	function setupScene() 
-	{
-		// stop simulation 
-		controls['Play simulation'] = false;
-
-		resetAndClear(); // Clear the canvas and reset the buffers
-
-		gui.updateDisplay();
-
-		scene.obstacleRadius = controls['Obstacle radius'];
-		scene.overRelaxation = 1.9;
-
-		scene.dt = 1.0 / 60.0;
-		scene.numPressureIters = 50;
-		scene.numParticleIters = 2;
-
-		// var res = 100;
-		var res = controls['Resolution'];
-		scene.gravity = controls['Gravity'];
-
-		// Calculate simHeight based on the ratio of the current resolution to the base resolution
-		let baseResolution = 100;
-
-		simHeight = 3.0 * (baseResolution / res);
-		cScale = canvas.height / simHeight;
-		simWidth = canvas.width / cScale;
-
-
-		// need to adjusting for resolution
-		// Adjust simHeight based on the resolution
-		// simHeight = 3.0 * (res / 100);
-		var tankHeight = 1.0 * simHeight;
-		var tankWidth = 1.0 * simWidth;
-		var h = tankHeight / (res);
-
-		var density = 1000.0;
-
-		var relWaterHeight = 0.8
-		var relWaterWidth = 0.6
-
-		// dam break
-		// compute number of particles
-
-		var r = 0.3 * h;	// particle radius w.r.t. cell size
-		var dx = 2.0 * r;
-		var dy = Math.sqrt(3.0) / 2.0 * dx;
-
- 		var numX = Math.floor((relWaterWidth * tankWidth - 2.0 * h - 2.0 * r) / dx);
-		var numY = Math.floor((relWaterHeight * tankHeight - 2.0 * h - 2.0 * r) / dy);
-		var maxParticles = numX * numY;		
-
-		// create fluid
-		fluid = new FlipFluid(density, tankWidth, tankHeight, h, r, maxParticles);
-
-		// create particles
-		fluid.numParticles = numX * numY;
-		
-		var p = 0;
-		for (var i = 0; i < numX; i++) {
-			for (var j = 0; j < numY; j++) {
-				fluid.particlePos[p++] = h + r + dx * i + (j % 2 == 0 ? 0.0 : r);
-				fluid.particlePos[p++] = h + r + dy * j
-			}
+	for (var i = 0; i < fluid.fNumX; i++) {
+		for (var j = 0; j < fluid.fNumY; j++) {
+			var s = 1.0;	// fluid
+			if (i == 0 || i == fluid.fNumX-1 || j == 0)
+				s = 0.0;	// solid
+			fluid.s[i*n + j] = s
 		}
-
-		// setup grid cells for tank
-		var n = fluid.fNumY;
-
-		for (var i = 0; i < fluid.fNumX; i++) {
-			for (var j = 0; j < fluid.fNumY; j++) {
-				var s = 1.0;	// fluid
-				if (i == 0 || i == fluid.fNumX-1 || j == 0)
-					s = 0.0;	// solid
-				fluid.s[i*n + j] = s
-			}
-		}
-
-		// set obstacle
-		setObstacle(3.0, 2.0, true);
 	}
+
+	// set obstacle
+	setObstacle(3.0, 2.0, true);
+}
+
 function main() {
 			
 	// get canvas and webgl context
@@ -612,7 +449,7 @@ function main() {
 		
 	}
 
-		// interaction -------------------------------------------------------
+	// interaction -------------------------------------------------------
 
 	var mouseDown = false;
 
@@ -724,7 +561,7 @@ function main() {
 	setupScene();
 	update();
 		
-	}	
-	
-	// call main function to start the program
-	main(); 
+}	
+
+// call main function to start the program
+main(); 
