@@ -63,8 +63,6 @@ export class FlipFluid {
 		this.fNumY = Math.floor(height / spacing) + 1;
 		this.h = Math.max(width / this.fNumX, height / this.fNumY);
 
-		console.log("the h value is: ", this.h);
-
 		this.fInvSpacing = 1.0 / this.h;
 		this.fNumCells = this.fNumX * this.fNumY;
 

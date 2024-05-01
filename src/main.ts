@@ -13,12 +13,12 @@ import { setGL } from './globals';
 	let simWidth: number;
 	let canvas: HTMLCanvasElement;
 	let gl: WebGL2RenderingContext;
-	let isFirstSetup = true; 
+
+	let resolutionChanged = false;
 
 	// GUI controls 
 	const controls = {
 	'Load Scene': setupScene, // A function pointer, essentially
-	// 'TESTETSETSTE': setupScene, // A function pointer, essentially
 	'Obstacle radius' : 0.1,
 	'Resolution' : 100,
 	'Gravity': -9.81,
@@ -40,7 +40,8 @@ import { setGL } from './globals';
 	// Add controls to the gui
 	gui.add(controls, 'Load Scene');
 	gui.add(controls, 'Obstacle radius', 0.05, 0.2).step(0.005);   
-	gui.add(controls, 'Resolution', 10, 200).step(10).onChange(setupScene); // reset scene if resolution changes
+	// when resolution changes, make resolutionChanged true and call setupScene
+	gui.add(controls, 'Resolution', 10, 200).step(10).onChange(() => { resolutionChanged = true; setupScene();});
 	gui.add(controls, 'Gravity', -15.00, -8.0).step(0.01);
 	gui.add(controls, 'Speed Display');
 	gui.add(controls, 'Density Display');
@@ -91,45 +92,249 @@ import { setGL } from './globals';
 
 	// --------------------------------------------------------------
 
-	function setObstacle(x: number, y: number, reset: boolean) {
+	// function setObstacle(x: number, y: number, reset: boolean) {
 
+	// 	var vx = 0.0;
+	// 	var vy = 0.0;
+
+	// 	if (!reset) {
+	// 		vx = (x - scene.obstacleX) / scene.dt;
+	// 		vy = (y - scene.obstacleY) / scene.dt;
+	// 	}
+
+	// 	scene.obstacleX = x;
+	// 	scene.obstacleY = y;
+	// 	var r = scene.obstacleRadius;
+	// 	var f = fluid;
+	// 	var n = f.fNumY;
+	// 	var cd = Math.sqrt(2) * f.h;
+
+	// 	for (var i = 1; i < f.fNumX-2; i++) {
+	// 		for (var j = 1; j < f.fNumY-2; j++) {
+
+	// 			f.s[i*n + j] = 1.0;
+
+	// 			var dx = (i + 0.5) * f.h - x;
+	// 			var dy = (j + 0.5) * f.h - y;
+
+	// 			if (dx * dx + dy * dy < r * r) {
+	// 				f.s[i*n + j] = 0.0;
+	// 				f.u[i*n + j] = vx;
+	// 				f.u[(i+1)*n + j] = vx;
+	// 				f.v[i*n + j] = vy;
+	// 				f.v[i*n + j+1] = vy;
+	// 			}
+	// 		}
+	// 	}
+		
+	// 	scene.showObstacle = true;
+	// 	scene.obstacleVelX = vx;
+	// 	scene.obstacleVelY = vy;
+	// }
+
+	// --------------------------------------------- WORKING 
+	function setObstacle(x: number, y: number, reset: boolean) {
 		var vx = 0.0;
 		var vy = 0.0;
-
+	
 		if (!reset) {
 			vx = (x - scene.obstacleX) / scene.dt;
 			vy = (y - scene.obstacleY) / scene.dt;
 		}
 
-		scene.obstacleX = x;
-		scene.obstacleY = y;
-		var r = scene.obstacleRadius;
-		var f = fluid;
-		var n = f.fNumY;
-		var cd = Math.sqrt(2) * f.h;
+		if (resolutionChanged) {
+			resolutionChanged = false; 
+			// Define a fixed reference resolution
+			var refResolution = 100;
+		
+			// Calculate the obstacle position and size based on the reference resolution
+			var refObstacleX = 30.0;
+			var refObstacleY = 20.0;
+			var refObstacleRadius = 0.1;
+		
+			var scaleX = refObstacleRadius * refResolution / controls['Resolution'];
+			var scaleY = scaleX;
+		
+			scene.obstacleX = refObstacleX * scaleX;
+			scene.obstacleY = refObstacleY * scaleY;
+			scene.obstacleRadius = refObstacleRadius * scaleX;
 
-		for (var i = 1; i < f.fNumX-2; i++) {
-			for (var j = 1; j < f.fNumY-2; j++) {
-
-				f.s[i*n + j] = 1.0;
-
-				var dx = (i + 0.5) * f.h - x;
-				var dy = (j + 0.5) * f.h - y;
-
-				if (dx * dx + dy * dy < r * r) {
-					f.s[i*n + j] = 0.0;
-					f.u[i*n + j] = vx;
-					f.u[(i+1)*n + j] = vx;
-					f.v[i*n + j] = vy;
-					f.v[i*n + j+1] = vy;
+			console.log('obstacle x if res changed: ', scene.obstacleX);
+			console.log('obstacle y if res changed: ', scene.obstacleY);
+			
+		
+			var r = scene.obstacleRadius;
+			var f = fluid;
+			var n = f.fNumY;
+			var cd = Math.sqrt(2) * f.h;
+		
+			for (var i = 1; i < f.fNumX - 2; i++) {
+				for (var j = 1; j < f.fNumY - 2; j++) {
+					f.s[i * n + j] = 1.0;
+		
+					var dx = (i + 0.5) * f.h - scene.obstacleX;
+					var dy = (j + 0.5) * f.h - scene.obstacleY;
+		
+					if (dx * dx + dy * dy < r * r) {
+						f.s[i * n + j] = 0.0;
+						f.u[i * n + j] = vx;
+						f.u[(i + 1) * n + j] = vx;
+						f.v[i * n + j] = vy;
+						f.v[i * n + j + 1] = vy;
+					}
 				}
 			}
-		}
 		
-		scene.showObstacle = true;
-		scene.obstacleVelX = vx;
-		scene.obstacleVelY = vy;
+			scene.showObstacle = true;
+			scene.obstacleVelX = vx;
+			scene.obstacleVelY = vy;
+
+			console.log('obstacle velx if res changed: ', scene.obstacleVelX);
+			console.log('obstacle vely if res changed: ', scene.obstacleVelY);
+			
+		} else {
+			scene.obstacleX = x;
+			scene.obstacleY = y;
+			console.log('obstacle x: ', scene.obstacleX);
+			console.log('obstacle y: ', scene.obstacleY);
+
+			var r = scene.obstacleRadius;
+			var f = fluid;
+			var n = f.fNumY;
+			var cd = Math.sqrt(2) * f.h;
+
+			for (var i = 1; i < f.fNumX-2; i++) {
+				for (var j = 1; j < f.fNumY-2; j++) {
+
+					f.s[i*n + j] = 1.0;
+
+					var dx = (i + 0.5) * f.h - x;
+					var dy = (j + 0.5) * f.h - y;
+
+					if (dx * dx + dy * dy < r * r) {
+						f.s[i*n + j] = 0.0;
+						f.u[i*n + j] = vx;
+						f.u[(i+1)*n + j] = vx;
+						f.v[i*n + j] = vy;
+						f.v[i*n + j+1] = vy;
+					}
+				}
+			}
+			
+			scene.showObstacle = true;
+			scene.obstacleVelX = vx;
+			scene.obstacleVelY = vy;
+			// log obstacle velx and vely
+			console.log('obstacle velx: ', scene.obstacleVelX);
+			console.log('obstacle vely: ', scene.obstacleVelY);
+		}
+	
+		
 	}
+	
+
+	
+	// function setObstacle(x: number, y: number, reset: boolean) {
+	// 	var vx = 0.0;
+	// 	var vy = 0.0;
+	
+	// 	if (!reset) {
+	// 		vx = (x - scene.obstacleX) / scene.dt;
+	// 		vy = (y - scene.obstacleY) / scene.dt;
+	// 	}
+
+	// 	if (resolutionChanged) {
+	// 		resolutionChanged = false; 
+	// 		// Define a fixed reference resolution
+	// 		var refResolution = 100;
+		
+	// 		// Calculate the obstacle position and size based on the reference resolution
+	// 		var refObstacleX = scene.obstacleX;
+	// 		var refObstacleY = scene.obstacleY;
+	// 		var refObstacleRadius = 0.1;
+		
+	// 		var scaleX = refObstacleRadius * refResolution / controls['Resolution'];
+	// 		var scaleY = scaleX;
+		
+	// 		// scene.obstacleX = refObstacleX * scaleX;
+	// 		// scene.obstacleY = refObstacleY * scaleY;
+	// 		// scene.obstacleRadius = refObstacleRadius * scaleX;
+
+	// 		scene.obstacleX = scene.obstacleX * refResolution / controls['Resolution'];
+	// 		scene.obstacleY = scene.obstacleY * refResolution / controls['Resolution'];
+
+	// 		console.log('obstacle x if res changed: ', scene.obstacleX);
+	// 		console.log('obstacle y if res changed: ', scene.obstacleY);
+			
+		
+	// 		var r = scene.obstacleRadius;
+	// 		var f = fluid;
+	// 		var n = f.fNumY;
+	// 		var cd = Math.sqrt(2) * f.h;
+		
+	// 		for (var i = 1; i < f.fNumX - 2; i++) {
+	// 			for (var j = 1; j < f.fNumY - 2; j++) {
+	// 				f.s[i * n + j] = 1.0;
+		
+	// 				var dx = (i + 0.5) * f.h - scene.obstacleX;
+	// 				var dy = (j + 0.5) * f.h - scene.obstacleY;
+		
+	// 				if (dx * dx + dy * dy < r * r) {
+	// 					f.s[i * n + j] = 0.0;
+	// 					f.u[i * n + j] = vx;
+	// 					f.u[(i + 1) * n + j] = vx;
+	// 					f.v[i * n + j] = vy;
+	// 					f.v[i * n + j + 1] = vy;
+	// 				}
+	// 			}
+	// 		}
+		
+	// 		scene.showObstacle = true;
+	// 		scene.obstacleVelX = vx;
+	// 		scene.obstacleVelY = vy;
+
+	// 		console.log('obstacle velx if res changed: ', scene.obstacleVelX);
+	// 		console.log('obstacle vely if res changed: ', scene.obstacleVelY);
+			
+	// 	} else {
+	// 		scene.obstacleX = x;
+	// 		scene.obstacleY = y;
+	// 		console.log('obstacle x: ', scene.obstacleX);
+	// 		console.log('obstacle y: ', scene.obstacleY);
+
+	// 		var r = scene.obstacleRadius;
+	// 		var f = fluid;
+	// 		var n = f.fNumY;
+	// 		var cd = Math.sqrt(2) * f.h;
+
+	// 		for (var i = 1; i < f.fNumX-2; i++) {
+	// 			for (var j = 1; j < f.fNumY-2; j++) {
+
+	// 				f.s[i*n + j] = 1.0;
+
+	// 				var dx = (i + 0.5) * f.h - x;
+	// 				var dy = (j + 0.5) * f.h - y;
+
+	// 				if (dx * dx + dy * dy < r * r) {
+	// 					f.s[i*n + j] = 0.0;
+	// 					f.u[i*n + j] = vx;
+	// 					f.u[(i+1)*n + j] = vx;
+	// 					f.v[i*n + j] = vy;
+	// 					f.v[i*n + j+1] = vy;
+	// 				}
+	// 			}
+	// 		}
+			
+	// 		scene.showObstacle = true;
+	// 		scene.obstacleVelX = vx;
+	// 		scene.obstacleVelY = vy;
+	// 		// log obstacle velx and vely
+	// 		console.log('obstacle velx: ', scene.obstacleVelX);
+	// 		console.log('obstacle vely: ', scene.obstacleVelY);
+	// 	}
+	
+		
+	// }
 
 	function setupScene() 
 	{
