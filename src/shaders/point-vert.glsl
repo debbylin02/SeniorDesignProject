@@ -5,7 +5,7 @@ in vec2 attrPosition;
 in vec3 attrColor;
 uniform vec2 domainSize;
 uniform float pointSize;
-uniform float drawDisk;
+uniform float drawObstacle;
 
 out vec3 fs_Col;
 out float fragDrawDisk;
@@ -18,5 +18,5 @@ gl_Position =
 
 gl_PointSize = pointSize;
 fs_Col = attrColor;
-fragDrawDisk = drawDisk;
+fragDrawDisk = drawObstacle;
 }
