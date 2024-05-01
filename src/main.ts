@@ -3,7 +3,6 @@ import { FlipFluid } from './Flip/FlipFluid';
 import { FlipFluidScene } from './Flip/FlipFluidScene';
 const Stats = require('stats-js');
 import * as DAT from 'dat.gui';
-import { createShader, resetGL } from './rendering/gl/ShaderHelper';
 import ShaderProgram, { Shader } from './rendering/gl/ShaderProgram';
 import { setGL } from './globals';
 
