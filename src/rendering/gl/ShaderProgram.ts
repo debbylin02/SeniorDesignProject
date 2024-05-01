@@ -7,37 +7,40 @@
 // export class Shader {
 //   shader: WebGLShader;
 
-//   constructor(type: number, source: string) {
-//     this.shader = <WebGLShader> gl.createShader(type);
-//     gl.shaderSource(this.shader, source);
-//     gl.compileShader(this.shader);
+//     // --------------------------------------------------------------
+//     constructor(gl: WebGL2RenderingContext, vsSource: string, fsSource: string) {
+//         const vsShader = <WebGLShader>gl.createShader(gl.VERTEX_SHADER);
+//         gl.shaderSource(vsShader, vsSource);
+//         gl.compileShader(vsShader);
+//         if (!gl.getShaderParameter(vsShader, gl.COMPILE_STATUS))
+//             console.log("vertex shader compile error: " + gl.getShaderInfoLog(vsShader));
 
-//     if (!gl.getShaderParameter(this.shader, gl.COMPILE_STATUS)) {
-//       throw gl.getShaderInfoLog(this.shader);
+//         const fsShader = <WebGLShader>gl.createShader(gl.FRAGMENT_SHADER);
+//         gl.shaderSource(fsShader, fsSource);
+//         gl.compileShader(fsShader);
+//         if (!gl.getShaderParameter(fsShader, gl.COMPILE_STATUS))
+//             console.log("fragment shader compile error: " + gl.getShaderInfoLog(fsShader));
+
+//         this.shader = <WebGLProgram>gl.createProgram();
+//         gl.attachShader( this.shader, vsShader);
+//         gl.attachShader( this.shader, fsShader);
+//         gl.linkProgram( this.shader);
 //     }
-//   }
+
 // };
 
 // class ShaderProgram {
 //   prog: WebGLProgram;
 
-//   attrPos: number;
-//   attrNor: number;
-//   attrCol: number;
+//   attrPosition: number;
+//   attrColor: number; // used by point-vert 
 
-//   unifModel: WebGLUniformLocation;
-//   unifModelInvTr: WebGLUniformLocation;
-//   unifViewProj: WebGLUniformLocation;
+//   domainSize: WebGLUniformLocation;
+//   pointSize: WebGLUniformLocation;
+//   drawDisk: WebGLUniformLocation;
+//   color: WebGLUniformLocation; // used by mesh-vert
+//   scale: WebGLUniformLocation;
 
-//   // colors 
-//   unifColor: WebGLUniformLocation;
-//   unifBottomColor: WebGLUniformLocation;
-
-//   // added time 
-//   unifTime: WebGLUniformLocation; 
-
-//   // flame size 
-//   unifFlameSize: WebGLUniformLocation; 
 
 //   constructor(shaders: Array<Shader>) {
 //     this.prog = <WebGLProgram> gl.createProgram();
@@ -50,7 +53,7 @@
 //       throw gl.getProgramInfoLog(this.prog);
 //     }
 
-//     // this.attrPos = gl.getAttribLocation(this.prog, "vs_Pos");
+//     this.attrPosition = gl.getAttribLocation(this.prog, "vs_Pos");
 //     // this.attrNor = gl.getAttribLocation(this.prog, "vs_Nor");
 //     // this.attrCol = gl.getAttribLocation(this.prog, "vs_Col");
 

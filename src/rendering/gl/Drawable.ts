@@ -3,29 +3,20 @@
 // abstract class Drawable {
 //   count: number = 0;
 
-//   bufIdx: WebGLBuffer;
-//   bufPos: WebGLBuffer;
-//   bufNor: WebGLBuffer;
-
-//   // bufOffset: WebGLBuffer;
-//   // offsetBound: boolean = false;
-
-//   // color 
-//   bufCol: WebGLBuffer;
-//   colBound: boolean = false;
-
-//   idxBound: boolean = false;
+//   bufPos: WebGLBuffer | null = null;
+//   bufCol: WebGLBuffer | null = null;
+//   bufIdx: WebGLBuffer | null = null;
+  
 //   posBound: boolean = false;
-//   norBound: boolean = false;
-
+//   colBound: boolean = false;
+//   idxBound: boolean = false;
+  
 //   abstract create() : void;
 
 //   destory() {
 //     gl.deleteBuffer(this.bufIdx);
 //     gl.deleteBuffer(this.bufPos);
-//     gl.deleteBuffer(this.bufNor);
-
-//     // gl.deleteBuffer(this.bufOffset);
+//     gl.deleteBuffer(this.bufCol);
 //   }
 
 //   generateIdx() {
@@ -38,28 +29,11 @@
 //     this.bufPos = gl.createBuffer();
 //   }
 
-//   generateNor() {
-//     this.norBound = true;
-//     this.bufNor = gl.createBuffer();
-//   }
-
 //   generateCol() {
 //     this.colBound = true;
 //     this.bufCol = gl.createBuffer();
 //   }
 
-//   // generateOffset() {
-//   //   this.offsetBound = true;
-//   //   this.bufOffset = gl.createBuffer();
-//   // }
-
-//   // bindOffset(): boolean {
-//   //   if (this.offsetBound) {
-//   //     gl.bindBuffer(gl.ARRAY_BUFFER, this.bufOffset);
-//   //   }
-//   //   return this.offsetBound;
-//   // }
-  
 
 //   bindIdx(): boolean {
 //     if (this.idxBound) {
@@ -73,13 +47,6 @@
 //       gl.bindBuffer(gl.ARRAY_BUFFER, this.bufPos);
 //     }
 //     return this.posBound;
-//   }
-
-//   bindNor(): boolean {
-//     if (this.norBound) {
-//       gl.bindBuffer(gl.ARRAY_BUFFER, this.bufNor);
-//     }
-//     return this.norBound;
 //   }
 
 //   bindCol(): boolean { 

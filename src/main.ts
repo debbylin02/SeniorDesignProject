@@ -14,8 +14,8 @@ import * as DAT from 'dat.gui';
 
 	// GUI controls 
 	const controls = {
-	// 'Load Scene': setupScene, // A function pointer, essentially
-	'TESTETSETSTE': setupScene, // A function pointer, essentially
+	'Load Scene': setupScene, // A function pointer, essentially
+	// 'TESTETSETSTE': setupScene, // A function pointer, essentially
 	'Obstacle radius' : 0.1,
 	'Resolution' : 100,
 	'Gravity': -9.81,
@@ -35,7 +35,7 @@ import * as DAT from 'dat.gui';
 	// Set up the GUI
 	let gui = new DAT.GUI();
 	// Add controls to the gui
-	gui.add(controls, 'TESTETSETSTE');
+	gui.add(controls, 'Load Scene');
 	gui.add(controls, 'Obstacle radius', 0.05, 0.2).step(0.005);   
 	gui.add(controls, 'Resolution', 10, 200).step(10).onChange(setupScene); // reset scene if resolution changes
 	gui.add(controls, 'Gravity', -15.00, -8.0).step(0.01);
@@ -50,206 +50,6 @@ import * as DAT from 'dat.gui';
 	gui.add(controls, 'Play simulation');
 	
 	
-	// gui.add(controls, 'Streamlines');
-
-	// if resolution changes then setup the scene
-	
-
-	function setObstacle(x: number, y: number, reset: boolean) {
-
-		var vx = 0.0;
-		var vy = 0.0;
-
-		if (!reset) {
-			vx = (x - scene.obstacleX) / scene.dt;
-			vy = (y - scene.obstacleY) / scene.dt;
-		}
-
-		scene.obstacleX = x;
-		scene.obstacleY = y;
-		var r = scene.obstacleRadius;
-		var f = fluid;
-		var n = f.fNumY;
-		var cd = Math.sqrt(2) * f.h;
-
-		for (var i = 1; i < f.fNumX-2; i++) {
-			for (var j = 1; j < f.fNumY-2; j++) {
-
-				f.s[i*n + j] = 1.0;
-
-				var dx = (i + 0.5) * f.h - x;
-				var dy = (j + 0.5) * f.h - y;
-
-				if (dx * dx + dy * dy < r * r) {
-					f.s[i*n + j] = 0.0;
-					f.u[i*n + j] = vx;
-					f.u[(i+1)*n + j] = vx;
-					f.v[i*n + j] = vy;
-					f.v[i*n + j+1] = vy;
-				}
-			}
-		}
-		
-		scene.showObstacle = true;
-		scene.obstacleVelX = vx;
-		scene.obstacleVelY = vy;
-	}
-
-	function setupScene() 
-	{
-		// stop simulation 
-		controls['Play simulation'] = false;
-
-		gui.updateDisplay();
-
-		scene.obstacleRadius = controls['Obstacle radius'];
-		scene.overRelaxation = 1.9;
-
-		scene.dt = 1.0 / 60.0;
-		scene.numPressureIters = 50;
-		scene.numParticleIters = 2;
-
-		// var res = 100;
-		var res = controls['Resolution'];
-		scene.gravity = controls['Gravity'];
-
-			
-		// Calculate scale based on simHeight
-		// adjusting for resolution
-		// simHeight = 3.0;
-
-		// Calculate simHeight based on the ratio of the current resolution to the base resolution
-		let baseResolution = 100;
-
-		simHeight = 3.0 * (baseResolution / res);
-		// Calculate the aspect ratio of the canvas
-		// let canvasAspectRatio = canvas.width / canvas.height;
-
-		cScale = canvas.height / simHeight;
-		// simWidth = simHeight * canvasAspectRatio;
-		simWidth = canvas.width / cScale;
-
-
-		// need to adjusting for resolution
-		// Adjust simHeight based on the resolution
-		// simHeight = 3.0 * (res / 100);
-		var tankHeight = 1.0 * simHeight;
-		var tankWidth = 1.0 * simWidth;
-
-		// var baseResolution = 100;  // The resolution where current settings work well
-		// var baseH = tankHeight / baseResolution;  // This calculates to the ideal cell size at the base resolution
-		// var h = baseH * (baseResolution / res);
-
-
-		var h = tankHeight / (res);
-
-		var density = 1000.0;
-
-		var relWaterHeight = 0.8
-		var relWaterWidth = 0.6
-
-		// dam break
-		// compute number of particles
-
-		var r = 0.3 * h;	// particle radius w.r.t. cell size
-		var dx = 2.0 * r;
-		var dy = Math.sqrt(3.0) / 2.0 * dx;
-
- 		var numX = Math.floor((relWaterWidth * tankWidth - 2.0 * h - 2.0 * r) / dx);
-		var numY = Math.floor((relWaterHeight * tankHeight - 2.0 * h - 2.0 * r) / dy);
-		var maxParticles = numX * numY;		
-
-		// create fluid
-
-		fluid = new FlipFluid(density, tankWidth, tankHeight, h, r, maxParticles);
-
-		// create particles
-
-		fluid.numParticles = numX * numY;
-		
-		console.log("Number of particles: ", fluid.numParticles);
-		console.log("h: ", h);
-		console.log("simHeight: ", simHeight);
-		console.log("simWidth: ", simWidth);
-		console.log("tankHeight: ", tankHeight);
-		console.log("tankWidth: ", tankWidth);
-		console.log("NumX: ", numX);
-		console.log("NumY: ", numY);
-
-		var p = 0;
-		for (var i = 0; i < numX; i++) {
-			for (var j = 0; j < numY; j++) {
-				fluid.particlePos[p++] = h + r + dx * i + (j % 2 == 0 ? 0.0 : r);
-				fluid.particlePos[p++] = h + r + dy * j
-			}
-		}
-
-		// setup grid cells for tank
-
-		var n = fluid.fNumY;
-
-		for (var i = 0; i < fluid.fNumX; i++) {
-			for (var j = 0; j < fluid.fNumY; j++) {
-				var s = 1.0;	// fluid
-				if (i == 0 || i == fluid.fNumX-1 || j == 0)
-					s = 0.0;	// solid
-				fluid.s[i*n + j] = s
-			}
-		}
-
-
-
-		setObstacle(3.0, 2.0, true);
-	}
-	function main() {
-			
-		// get canvas and webgl context
-		canvas = <HTMLCanvasElement> document.getElementById('canvas');
-		gl = <WebGL2RenderingContext> canvas.getContext('webgl2');
-
-		if (!gl) {
-			alert('WebGL 2 not supported!');
-		}
-
-		canvas.width = window.innerWidth - 20;
-		canvas.height = window.innerHeight - 20;
-		canvas.focus();
-
-		// Initial display for framerate
-		
-		const stats = Stats();
-		stats.setMode(0);
-		stats.domElement.style.position = 'absolute';
-		stats.domElement.style.left = '0px';
-		stats.domElement.style.top = '0px';
-		document.body.appendChild(stats.domElement);
-
-		var cnt = 0;
-
-
-	// draw -------------------------------------------------------
-	function createShader(gl : WebGL2RenderingContext, vsSource: string, fsSource: string) 
-	{
-		const vsShader = <WebGLShader> gl.createShader(gl.VERTEX_SHADER);
-		gl.shaderSource(vsShader, vsSource);
-		gl.compileShader(vsShader);
-		if (!gl.getShaderParameter(vsShader, gl.COMPILE_STATUS))
-			console.log("vertex shader compile error: " + gl.getShaderInfoLog(vsShader));
-
-		const fsShader =  <WebGLShader> gl.createShader(gl.FRAGMENT_SHADER);
-		gl.shaderSource(fsShader, fsSource);
-		gl.compileShader(fsShader);
-		if (!gl.getShaderParameter(fsShader, gl.COMPILE_STATUS))
-			console.log("fragment shader compile error: " + gl.getShaderInfoLog(fsShader));
-
-		var shader = <WebGLProgram> gl.createProgram();
-		gl.attachShader(shader, vsShader);
-		gl.attachShader(shader, fsShader);
-		gl.linkProgram(shader);
-
-		return shader;
-	}
-
 	var pointShader: WebGLShader;
 	var meshShader: WebGLShader;
 
@@ -262,8 +62,46 @@ import * as DAT from 'dat.gui';
 	var diskVertBuffer: WebGLBuffer | null = null;
 	var diskIdBuffer: WebGLBuffer | null = null;
 
+	function resetAndClear() {
+		gl.clearColor(0.0, 0.0, 0.0, 1.0);
+		gl.clear(gl.COLOR_BUFFER_BIT);
+
+		gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+
+		pointVertexBuffer = null;
+		pointColorBuffer = null;
+		gridVertBuffer = null;
+		gridColorBuffer = null;
+		diskVertBuffer = null;
+		diskIdBuffer = null;
+	}
+
+	function createShader(gl: WebGL2RenderingContext, vsSource: string, fsSource: string) {
+		const vsShader = <WebGLShader>gl.createShader(gl.VERTEX_SHADER);
+		gl.shaderSource(vsShader, vsSource);
+		gl.compileShader(vsShader);
+		if (!gl.getShaderParameter(vsShader, gl.COMPILE_STATUS))
+			console.log("vertex shader compile error: " + gl.getShaderInfoLog(vsShader));
+
+		const fsShader = <WebGLShader>gl.createShader(gl.FRAGMENT_SHADER);
+		gl.shaderSource(fsShader, fsSource);
+		gl.compileShader(fsShader);
+		if (!gl.getShaderParameter(fsShader, gl.COMPILE_STATUS))
+			console.log("fragment shader compile error: " + gl.getShaderInfoLog(fsShader));
+
+		var shader = <WebGLProgram>gl.createProgram();
+		gl.attachShader( shader, vsShader);
+		gl.attachShader( shader, fsShader);
+		gl.linkProgram( shader);
+
+		return shader;
+	}
+
+
+		
 	function draw() 
 	{
+	
 		gl.clearColor(0.0, 0.0, 0.0, 1.0);
 		gl.clear(gl.COLOR_BUFFER_BIT);
 
@@ -286,10 +124,10 @@ import * as DAT from 'dat.gui';
 
 			for (var i = 0; i < f.fNumX; i++) {
 				for (var j = 0; j < f.fNumY; j++) {
-					// cellCenters[p++] = (i + 0.5) * 1;
-					// cellCenters[p++] = (j + 0.5) * 1;
-					cellCenters[p++] = (i + 0.5) * f.h;
+					cellCenters[p++] = (i + 0.5) * f.h;	// check f.h size 
 					cellCenters[p++] = (j + 0.5) * f.h;
+
+					console.log("f.h: ", f.h, " cell center: ", cellCenters[p-2], " , " , cellCenters[p-1]);
 				}
 			}
 			gl.bindBuffer(gl.ARRAY_BUFFER, gridVertBuffer);
@@ -426,6 +264,185 @@ import * as DAT from 'dat.gui';
 		gl.disableVertexAttribArray(posLoc);		
 		
 	}
+
+	// --------------------------------------------------------------
+
+	function setObstacle(x: number, y: number, reset: boolean) {
+
+		var vx = 0.0;
+		var vy = 0.0;
+
+		if (!reset) {
+			vx = (x - scene.obstacleX) / scene.dt;
+			vy = (y - scene.obstacleY) / scene.dt;
+		}
+
+		scene.obstacleX = x;
+		scene.obstacleY = y;
+		var r = scene.obstacleRadius;
+		var f = fluid;
+		var n = f.fNumY;
+		var cd = Math.sqrt(2) * f.h;
+
+		for (var i = 1; i < f.fNumX-2; i++) {
+			for (var j = 1; j < f.fNumY-2; j++) {
+
+				f.s[i*n + j] = 1.0;
+
+				var dx = (i + 0.5) * f.h - x;
+				var dy = (j + 0.5) * f.h - y;
+
+				if (dx * dx + dy * dy < r * r) {
+					f.s[i*n + j] = 0.0;
+					f.u[i*n + j] = vx;
+					f.u[(i+1)*n + j] = vx;
+					f.v[i*n + j] = vy;
+					f.v[i*n + j+1] = vy;
+				}
+			}
+		}
+		
+		scene.showObstacle = true;
+		scene.obstacleVelX = vx;
+		scene.obstacleVelY = vy;
+	}
+
+	function setupScene() 
+	{
+		// stop simulation 
+		controls['Play simulation'] = false;
+
+		resetAndClear(); // Clear the canvas and reset the buffers
+
+		gui.updateDisplay();
+
+		scene.obstacleRadius = controls['Obstacle radius'];
+		scene.overRelaxation = 1.9;
+
+		scene.dt = 1.0 / 60.0;
+		scene.numPressureIters = 50;
+		scene.numParticleIters = 2;
+
+		// var res = 100;
+		var res = controls['Resolution'];
+		scene.gravity = controls['Gravity'];
+
+			
+		// Calculate scale based on simHeight
+		// adjusting for resolution
+		// simHeight = 3.0;
+
+		// Calculate simHeight based on the ratio of the current resolution to the base resolution
+		let baseResolution = 100;
+
+		simHeight = 3.0 * (baseResolution / res);
+		// Calculate the aspect ratio of the canvas
+		// let canvasAspectRatio = canvas.width / canvas.height;
+
+		cScale = canvas.height / simHeight;
+		// simWidth = simHeight * canvasAspectRatio;
+		simWidth = canvas.width / cScale;
+
+
+		// need to adjusting for resolution
+		// Adjust simHeight based on the resolution
+		// simHeight = 3.0 * (res / 100);
+		var tankHeight = 1.0 * simHeight;
+		var tankWidth = 1.0 * simWidth;
+
+		// var baseResolution = 100;  // The resolution where current settings work well
+		// var baseH = tankHeight / baseResolution;  // This calculates to the ideal cell size at the base resolution
+		// var h = baseH * (baseResolution / res);
+
+
+		var h = tankHeight / (res);
+
+		var density = 1000.0;
+
+		var relWaterHeight = 0.8
+		var relWaterWidth = 0.6
+
+		// dam break
+		// compute number of particles
+
+		var r = 0.3 * h;	// particle radius w.r.t. cell size
+		var dx = 2.0 * r;
+		var dy = Math.sqrt(3.0) / 2.0 * dx;
+
+ 		var numX = Math.floor((relWaterWidth * tankWidth - 2.0 * h - 2.0 * r) / dx);
+		var numY = Math.floor((relWaterHeight * tankHeight - 2.0 * h - 2.0 * r) / dy);
+		var maxParticles = numX * numY;		
+
+		// create fluid
+
+		fluid = new FlipFluid(density, tankWidth, tankHeight, h, r, maxParticles);
+
+		// create particles
+
+		fluid.numParticles = numX * numY;
+		
+		console.log("Number of particles: ", fluid.numParticles);
+		console.log("h: ", h);
+		console.log("simHeight: ", simHeight);
+		console.log("simWidth: ", simWidth);
+		console.log("tankHeight: ", tankHeight);
+		console.log("tankWidth: ", tankWidth);
+		console.log("NumX: ", numX);
+		console.log("NumY: ", numY);
+
+		var p = 0;
+		for (var i = 0; i < numX; i++) {
+			for (var j = 0; j < numY; j++) {
+				fluid.particlePos[p++] = h + r + dx * i + (j % 2 == 0 ? 0.0 : r);
+				fluid.particlePos[p++] = h + r + dy * j
+			}
+		}
+
+		// setup grid cells for tank
+
+		var n = fluid.fNumY;
+
+		for (var i = 0; i < fluid.fNumX; i++) {
+			for (var j = 0; j < fluid.fNumY; j++) {
+				var s = 1.0;	// fluid
+				if (i == 0 || i == fluid.fNumX-1 || j == 0)
+					s = 0.0;	// solid
+				fluid.s[i*n + j] = s
+			}
+		}
+
+
+
+		setObstacle(3.0, 2.0, true);
+	}
+	function main() {
+			
+		// get canvas and webgl context
+		canvas = <HTMLCanvasElement> document.getElementById('canvas');
+		gl = <WebGL2RenderingContext> canvas.getContext('webgl2');
+
+		if (!gl) {
+			alert('WebGL 2 not supported!');
+		}
+
+		canvas.width = window.innerWidth - 20;
+		canvas.height = window.innerHeight - 20;
+		canvas.focus();
+
+		// Initial display for framerate
+		
+		const stats = Stats();
+		stats.setMode(0);
+		stats.domElement.style.position = 'absolute';
+		stats.domElement.style.left = '0px';
+		stats.domElement.style.top = '0px';
+		document.body.appendChild(stats.domElement);
+
+		var cnt = 0;
+
+
+	// draw -------------------------------------------------------
+
 
 	// interaction -------------------------------------------------------
 
