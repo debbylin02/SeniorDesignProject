@@ -9,50 +9,56 @@ enum CellType {
 	SOLID_CELL = 2
 }
 
+// Enum for edge types
+const EdgeType = {
+    EMPTY: 0,
+    SOLID: 1
+};
+
+
 export class MarchingSquares {
 	
-	// offsets for marching squares algorithm 
-	MARCHING_SQUARES_VERTEX_OFFSETS = [
-		[], // Case 0: Empty configuration
-		[[0, 0.5], [0.5, 0]], // Case 1: One corner inside (bottom right)
-		[[0.5, 0], [1, 0.5]], // Case 2: One corner inside (bottom left)
-		[[1, 0.5], [0.5, 1]], // Case 3: Two corners inside (bottom)
-		[[0.5, 1], [0, 0.5]], // Case 4: One corner inside (top left)
-		[[0, 0.5], [0.5, 1]], // Case 5: Two corners inside (left)
-		[[0.5, 0], [1, 0.5], [0.5, 1], [0, 0.5]], // Case 6: Three corners inside (left, bottom)
-		[[1, 0.5], [0.5, 0]], // Case 7: One corner inside (bottom right)
-		[[0.5, 1], [1, 0.5]], // Case 8: One corner inside (top right)
-		[[0, 0.5], [0.5, 0], [1, 0.5], [0.5, 1]], // Case 9: Three corners inside (bottom, right)
-		[[0.5, 0], [0, 0.5]], // Case 10: One corner inside (top left)
-		[[1, 0.5], [0.5, 0], [0, 0.5], [0.5, 1]], // Case 11: Three corners inside (top, left)
-		[[0, 0.5], [0.5, 1]], // Case 12: Two corners inside (top)
-		[[0.5, 0], [1, 0.5], [0, 0.5], [0.5, 1]], // Case 13: Three corners inside (top, right)
-		[[1, 0.5], [0.5, 1]], // Case 14: Two corners inside (right)
-		[]  // Case 15: Empty configuration
+	// Define the intersection patterns for each configuration
+	binaryIntersectionPatterns = [
+		0b0000, // Configuration 0: No intersection
+		0b0001, // Configuration 1: Bottom
+		0b0010, // Configuration 2: Right
+		0b1000, // Configuration 3: Top
+		0b0100, // Configuration 4: Left
+		0b1010, // Configuration 5: Bottom-Right
+		0b1100, // Configuration 6: Top-Right
+		0b0110, // Configuration 7: Top-Left
+		0b0011, // Configuration 8: Left-Bottom
+		0b1100, // Configuration 9: Top-Left, Bottom-Right
+		0b1110, // Configuration 10: Top-Left, Top-Right
+		0b0111, // Configuration 11: Bottom-Left, Top-Right
+		0b1011, // Configuration 12: Bottom-Left, Bottom-Right
+		0b1001, // Configuration 13: Bottom-Left, Top
+		0b0101, // Configuration 14: Bottom, Top-Right
+		0b1111  // Configuration 15: All edges
 	];
 	
-	// Initialize the edgeTable for the marching squares algorithm
-	// Each entry in the table corresponds to a unique cell configuration
-	// The value is a bitmask representing which edges are part of the polygon
-	edgeTable = [
-		0b0000, // 0: 0000 (no edges)
-		0b0001, // 1: 0001 (bottom edge)
-		0b0010, // 2: 0010 (right edge)
-		0b0000, // 3: 0011 (bottom-right corner)
-		0b0100, // 4: 0100 (top edge)
-		0b1001, // 5: 0101 (bottom and top edges)
-		0b0011, // 6: 0110 (right and top edges)
-		0b0101, // 7: 0111 (bottom, top, and right edges)
-		0b1000, // 8: 1000 (left edge)
-		0b1010, // 9: 1001 (left and bottom edges)
-		0b1100, // 10: 1010 (left and right edges)
-		0b0000, // 11: 1011 (left, right, and bottom edges)
-		0b1101, // 12: 1100 (left and top edges)
-		0b1011, // 13: 1101 (left, top, and bottom edges)
-		0b1110, // 14: 1110 (left, top, and right edges)
-		0b0000, // 15: 1111 (all edges)
+
+	edgeIntersectionPatterns = [    
+		[],                                 // 0: 0000
+		[1, 2],                             // 1: 0001
+		[2, 3],                             // 2: 0010
+		[1, 3],                             // 3: 0011
+		[3, 0],                             // 4: 0100
+		[1, 0, 2, 3],                       // 5: 0101
+		[0, 2],                             // 6: 0110
+		[1, 0],                             // 7: 0111
+		[0, 1],                             // 8: 1000
+		[0, 1, 2, 3],                       // 9: 1001
+		[0, 2],                             // 10: 1010
+		[0, 3],                             // 11: 1011
+		[1, 3],                             // 12: 1100
+		[0, 3],                             // 13: 1101
+		[2, 3],                             // 14: 1110
+		[]                                  // 15: 1111
 	];
-	
+
+
 	// coordinates of the vertices that define the boundary of the fluid region
 	vertices: Float32Array; 
 	// indices of the vertices that define the edges of the fluid region (pairs of vertices)
@@ -61,89 +67,127 @@ export class MarchingSquares {
 	// intersections 
 	intersections: number[][] = [];
 
+	// cell types 
+	cellTypeArray: Int32Array;
+
 	fluid: FlipFluid; 
 	constructor(fluid: FlipFluid) {
 		this.vertices = new Float32Array(0);
 		this.edges = new Float32Array(0);
 		this.fluid = fluid;
+		this.cellTypeArray = fluid.cellType;
+	}
+
+	// --------- get cell type / configuration ---------------
+
+	checkBoundaries(x: number, y: number) {
+		return x >= 0 && x < this.fluid.fNumX && y >= 0 && y < this.fluid.fNumY;
+	}
+
+	getCellTypeAt(x: number, y: number) { 
+		// Determine the cell type  
+		var n = this.fluid.fNumY; // Number of cells in the y-direction
+		var cellNr = x * n + y;
+
+		// check if beyond boundaries
+		if (!this.checkBoundaries(x, y)) {
+			return CellType.SOLID_CELL;
+		} 
+
+		var cellType = this.cellTypeArray[cellNr];
+		return cellType; 
+	}
+
+	getCellConfiguration(x: number, y: number) {
+		const cellType = this.getCellTypeAt(x, y);
+
+		// Get the cell types of the neighboring cells
+		const top = this.getCellTypeAt(x, y - 1);
+		const right = this.getCellTypeAt(x + 1, y);
+		const bottom = this.getCellTypeAt(x, y + 1);
+		const left = this.getCellTypeAt(x - 1, y);
+	
+		let configuration = 0;
+
+		if (top === CellType.FLUID_CELL) configuration += 1;
+		if (right === CellType.FLUID_CELL) configuration += 2;
+		if (bottom === CellType.FLUID_CELL) configuration += 4;
+		if (left === CellType.FLUID_CELL) configuration += 8;
+	
+		return configuration;
+	}
+
+	getIntersectionPattern(x: number, y: number) {
+		// get cell configuration
+		const config = this.getCellConfiguration(x, y);
+		// return this.edgeIntersectionPatterns[config];
+		return this.binaryIntersectionPatterns[config];
+	}
+
+	// ----------------- marching squares ------------------------------
+	interpolateVertex(x: number, y: number, edge: number) {
+		const cellCenterX = (x + 0.5) * this.fluid.h;
+		const cellCenterY = (y + 0.5) * this.fluid.h;
+	
+		let vertexX, vertexY;
+		switch (edge) {
+			case 0: // Top edge
+				vertexX = cellCenterX;
+				vertexY = cellCenterY - this.fluid.h / 2;
+				break;
+			case 1: // Right edge
+				vertexX = cellCenterX + this.fluid.h / 2;
+				vertexY = cellCenterY;
+				break;
+			case 2: // Bottom edge
+				vertexX = cellCenterX;
+				vertexY = cellCenterY + this.fluid.h / 2;
+				break;
+			case 3: // Left edge
+				vertexX = cellCenterX - this.fluid.h / 2;
+				vertexY = cellCenterY;
+				break;
+			default:
+				throw new Error("Invalid edge index");
+		}
+	
+		return [vertexX, vertexY];
 	}
 
 	
-	// ----------------- marching squares ------------------------------
-	// Assume `gridSize` is the size of your grid
-	// Assume `cellSize` is the size of each cell in your grid
-	// Assume `cellType` is your existing Int32Array
-	// Assume `particleDensity` is your existing Float32Array
-
 	createMarchingSquares() {
 		let n = this.fluid.fNumY; // Number of cells in the y-direction
-		let cellTypeArray = this.fluid.cellType; // Array of cell types
+	
+		// Loop through each cell in the grid
+		for (var i = 0; i <  this.fluid.fNumX - 1; i++) {
+			for (var j = 0; j < this.fluid.fNumY - 1; j++) {
 
-		for (let y = 0; y < this.fluid.fNumY - 1; y++) {
-			for (let x = 0; x < this.fluid.fNumX - 1; x++) {
-				// Determine the cell configuration based on the cell types
-				let cellConfig = 0;
-				cellConfig |= (cellTypeArray[y * n + x] === CellType.FLUID_CELL) ? 1 : 0;
-				cellConfig |= (cellTypeArray[y * n + x + 1] === CellType.FLUID_CELL) ? 2 : 0;
-				// Use a lookup table to determine the edges and intersection points
-				let edges = this.edgeTable[cellConfig];
-				this.intersections = [];
-				for (let i = 0; i < 4; i++) {
-					if (edges & (1 << i)) {
-						let edgePoints = this.calculateEdgeIntersection(x, y, i);
-						if (edgePoints) {
-							this.intersections.push(edgePoints);
-						}
+				// Determine the intersection pattern for the current cell
+				var intersectionPattern = this.getIntersectionPattern(i, j);
+
+				// Generate vertices for the intersected edges
+				var vert = [];
+				var edges = []; 
+				for (var k = 0; k < 4; k++) {
+					if (intersectionPattern & (1 << k)) {
+						// returns [vertexX, vertexY];
+						var interpolated = this.interpolateVertex(i, j, k);
+						vert.push(interpolated[0], interpolated[1]);
 					}
 				}
 
-				// Render the polygon using the intersection points
-				// this.renderPolygon(intersections);
+				this.vertices = new Float32Array(vert);
+
+				// Generate triangles based on the intersection pattern
+				if (vert.length === 2) {
+					// Handle cases with 2 vertices (single line)
+				} else if (vert.length === 3) {
+					// Handle cases with 3 vertices (triangle)
+				}
 			}
 		}
 	}
 
-	calculateEdgeIntersection(x: number, y: number, edgeIndex: number) {
-		// Calculate the intersection point on the specified edge
-		// Return the intersection point as [x, y] coordinates
-
-		let p1, p2;
-		let cellWidth = 1.0; // Assuming each cell is 1 unit wide
-		let cellHeight = 1.0; // Assuming each cell is 1 unit high
-	
-		// Determine the endpoints of the edge based on the edge index
-		switch (edgeIndex) {
-			case 0: // Bottom edge
-				p1 = [x * cellWidth, y * cellHeight];
-				p2 = [(x + 1) * cellWidth, y * cellHeight];
-				break;
-			case 1: // Right edge
-				p1 = [(x + 1) * cellWidth, y * cellHeight];
-				p2 = [(x + 1) * cellWidth, (y + 1) * cellHeight];
-				break;
-			case 2: // Top edge
-				p1 = [(x + 1) * cellWidth, (y + 1) * cellHeight];
-				p2 = [x * cellWidth, (y + 1) * cellHeight];
-				break;
-			case 3: // Left edge
-				p1 = [x * cellWidth, (y + 1) * cellHeight];
-				p2 = [x * cellWidth, y * cellHeight];
-				break;
-			default:
-				return null; // Invalid edge index
-		}
-	
-		// Calculate the fluid density values at the edge endpoints
-		let d1 = this.fluid.particleDensity[y * this.fluid.pNumX + x];
-		let d2 = this.fluid.particleDensity[y * this.fluid.pNumX + x + 1];
-		let t = d1 / (d1 - d2); // Interpolation factor
-	
-		// Calculate the intersection point using linear interpolation
-		let ix = p1[0] + t * (p2[0] - p1[0]);
-		let iy = p1[1] + t * (p2[1] - p1[1]);
-	
-		return [ix, iy];
-	}
 		
 
 }

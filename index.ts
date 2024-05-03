@@ -1,4 +1,4 @@
-import { createFluidSim } from './src/FluidSim';
+import { createFluidSim } from '../src/FluidSim';
 import {vec2} from 'gl-matrix'; 
 
 const fluidSim = createFluidSim({
