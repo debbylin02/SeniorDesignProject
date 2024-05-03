@@ -5,6 +5,7 @@ const Stats = require('stats-js');
 import * as DAT from 'dat.gui';
 import ShaderProgram, { Shader } from './rendering/gl/ShaderProgram';
 import { setGL } from './globals';
+import { MarchingSquares } from './Flip/MarchingSquares';
 
 let scene = new FlipFluidScene();
 let fluid : FlipFluid; 
@@ -17,6 +18,8 @@ let gl: WebGL2RenderingContext;
 let resolutionChanged = false;
 let oldResolution: number = 100; 
 let currResolution: number = 100; 
+
+let marchingSquares: MarchingSquares;
 
 // GUI controls 
 const controls = {
@@ -33,8 +36,8 @@ const controls = {
 'Separate Particles': true,
 'PIC - FLIP Ratio': 0.9,
 'Fluid color' : [0, 0, 255, 1],
+'Marching Squares Display': false,
 'Play simulation': false, 
-// 'Play simulation': toggleStart,
 };
 
 // Set up the GUI
@@ -56,6 +59,7 @@ gui.add(controls, 'Compensate Drift');
 gui.add(controls, 'Separate Particles');
 gui.add(controls, 'PIC - FLIP Ratio', 0.0, 1.0).step(0.1);
 gui.addColor(controls, 'Fluid color'); 
+gui.add(controls, 'Marching Squares Display');
 gui.add(controls, 'Play simulation');
 
 
@@ -69,6 +73,9 @@ var gridColorBuffer: WebGLBuffer | null = null;
 var obstacleVertBuffer: WebGLBuffer | null = null;
 var obstacleIdBuffer: WebGLBuffer | null = null;
 
+var marchSquareVertBuffer: WebGLBuffer | null = null;
+var marchSquareIdBuffer: WebGLBuffer | null = null;
+var marchSquareColorBuffer: WebGLBuffer | null = null;
 // --------------------------------------------------------------
 
 function resetGl() {
@@ -89,6 +96,13 @@ function resetAndClear() {
 	gridColorBuffer = null;
 	obstacleVertBuffer = null;
 	obstacleIdBuffer = null;
+	marchSquareVertBuffer = null;
+	marchSquareIdBuffer = null;
+	marchSquareColorBuffer = null;
+
+	//     gl.deleteBuffer(this.bufIdx);
+	//     gl.deleteBuffer(this.bufPos);
+	//     gl.deleteBuffer(this.bufCol);
 }
 
 function setObstacle(x: number, y: number, reset: boolean) {
@@ -251,6 +265,9 @@ function setupScene()
 
 	// set obstacle
 	setObstacle(3.0, 2.0, true);
+
+	// create marching squares object
+	marchingSquares = new MarchingSquares(fluid);
 }
 
 function main() {
@@ -296,6 +313,17 @@ function main() {
 		new Shader(gl.VERTEX_SHADER, require('./shaders/point-vert.glsl')),
 		new Shader(gl.FRAGMENT_SHADER, require('./shaders/point-frag.glsl')),
 	]);
+
+	const marchSquaresProgram = new ShaderProgram([
+		new Shader(gl.VERTEX_SHADER, require('./shaders/march-squares-vert.glsl')),
+		new Shader(gl.FRAGMENT_SHADER, require('./shaders/march-squares-frag.glsl')),
+	]);
+
+	// const flatShaderProgram = new ShaderProgram([
+	// 	new Shader(gl.VERTEX_SHADER, require('./shaders/flat-vert.glsl')),
+	// 	new Shader(gl.FRAGMENT_SHADER, require('./shaders/flat-frag.glsl')),
+	// ]);
+
 
 	function draw() 
 	{
@@ -352,6 +380,461 @@ function main() {
 
 			gl.bindBuffer(gl.ARRAY_BUFFER, null);
 		}
+
+		// --------------------------------------------------------------
+
+		// var cellVertices = []; 
+		// var indices = []; 
+
+		// // marching squares 
+		// if (marchSquareVertBuffer == null) {
+		// 	var f = fluid;
+			
+		// 	marchSquareVertBuffer = gl.createBuffer();
+		// 	marchSquareIdBuffer = gl.createBuffer();
+
+		// 	// var cellCenters = new Float32Array(2 * f.fNumCells);
+
+		// 	// switch from getting cell centers to getting vertices for cells as squares 
+
+		// 	for (var i = 0; i < f.fNumX; i++) {
+		// 		for (var j = 0; j < f.fNumY; j++) {
+		// 			var x0 = i * f.h;
+		// 			var y0 = j * f.h;
+		// 			var x1 = (i + 1) * f.h;
+		// 			var y1 = j * f.h;
+		// 			var x2 = (i + 1) * f.h;
+		// 			var y2 = (j + 1) * f.h;
+		// 			var x3 = i * f.h;
+		// 			var y3 = (j + 1) * f.h;
+			
+		// 			// Add the vertices for the square
+		// 			cellVertices.push(
+		// 				x0, y0,
+		// 				x1, y1,
+		// 				x2, y2,
+		// 				x3, y3
+		// 			);
+			
+		// 			// Calculate the index offset for the current cell
+		// 			var indexOffset = (i * f.fNumY + j) * 6;
+
+		// 			// Add the indices for the two triangles of the cell
+		// 			indices.push(
+		// 				indexOffset, indexOffset + 1, indexOffset + 2,
+		// 				indexOffset + 2, indexOffset + 3, indexOffset
+		// 			);
+		// 		}
+		// 	}
+		
+		// 	gl.bindBuffer(gl.ARRAY_BUFFER, marchSquareVertBuffer);
+		// 	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(cellVertices), gl.DYNAMIC_DRAW);
+
+		// 	// Bind the index buffer and set the data
+		// 	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, marchSquareIdBuffer);
+		// 	gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
+
+		// 	// ----------- OLD ----------------
+		// 	// for (var i = 0; i < f.fNumX; i++) {
+		// 	// 	for (var j = 0; j < f.fNumY; j++) {
+		// 	// 		cellCenters[p++] = (i + 0.5) * f.h;	
+		// 	// 		cellCenters[p++] = (j + 0.5) * f.h;
+		// 	// 	}
+		// 	// }
+		// 	// gl.bindBuffer(gl.ARRAY_BUFFER, marchSquareVertBuffer);
+		// 	// gl.bufferData(gl.ARRAY_BUFFER, cellCenters, gl.DYNAMIC_DRAW);
+		// 	// gl.bindBuffer(gl.ARRAY_BUFFER, null);
+		// }
+
+		// if (marchSquareColorBuffer == null)
+		// 	marchSquareColorBuffer = gl.createBuffer();
+
+		// if (scene.showMarchingSquares) {
+
+		// 	var pointSize = 0.9 * fluid.h / simWidth * canvas.width;
+
+		// 	// set uniforms and attributes
+		// 	marchSquaresProgram.use();
+		// 	marchSquaresProgram.setDomainSize(simWidth, simHeight);
+		// 	marchSquaresProgram.setPointSize(pointSize);
+		// 	marchSquaresProgram.setDrawObstacle(0.0);
+
+		// 	gl.bindBuffer(gl.ARRAY_BUFFER, marchSquareVertBuffer);
+		// 	var posLoc = marchSquaresProgram.attrPosition;
+		// 	gl.enableVertexAttribArray(posLoc);
+		// 	gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+
+		// 	gl.bindBuffer(gl.ARRAY_BUFFER, marchSquareColorBuffer);
+		// 	gl.bufferData(gl.ARRAY_BUFFER, fluid.cellColor, gl.DYNAMIC_DRAW);
+
+		// 	var colorLoc = marchSquaresProgram.attrColor;
+		// 	gl.enableVertexAttribArray(colorLoc);
+		// 	gl.vertexAttribPointer(colorLoc, 3, gl.FLOAT, false, 0, 0);
+			
+		// 	// Bind the index buffer and draw the squares
+		// 	// gl.drawArrays(gl.TRIANGLES, 0, cellVertices.length / 2);
+		// 	// Draw the grid using the indices
+		// 	gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_INT, 0);
+
+		// 	gl.disableVertexAttribArray(posLoc);
+		// 	gl.disableVertexAttribArray(colorLoc);
+		
+		// 	gl.bindBuffer(gl.ARRAY_BUFFER, null);
+		// 	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+		// }
+
+		// --------------------------------------------------------------
+
+		// version to just draw ONE square 
+		var cellVertices = []; 
+		var indices = []; 
+
+		// marching squares 
+		if (marchSquareVertBuffer == null) {
+			var f = fluid;
+			
+			marchSquareVertBuffer = gl.createBuffer();
+			marchSquareIdBuffer = gl.createBuffer();
+
+			// var cellCenters = new Float32Array(2 * f.fNumCells);
+			cellVertices = [];
+			indices = []; 
+
+			cellVertices.push(
+				-0.5, -0.5,  // bottom left
+				 0.5, -0.5,  // bottom right
+				 0.5,  0.5,  // top right
+				-0.5,  0.5   // top left
+			);
+
+			gl.bindBuffer(gl.ARRAY_BUFFER, marchSquareVertBuffer);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(cellVertices), gl.DYNAMIC_DRAW);
+			gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+			indices.push(
+				0, 1, 2,  // first triangle
+				0, 2, 3   // second triangle
+			);
+
+			gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, marchSquareIdBuffer);
+			gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(indices), gl.DYNAMIC_DRAW);
+			gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+		}
+
+		if (marchSquareColorBuffer == null)
+			marchSquareColorBuffer = gl.createBuffer();
+
+		if (scene.showMarchingSquares) {
+
+			gl.clear(gl.DEPTH_BUFFER_BIT);
+
+			var obstacleColor = [1.0, 0.0, 0.0];
+		
+			// set uniforms and attributes
+			marchSquaresProgram.use();
+			marchSquaresProgram.setDomainSize(simWidth, simHeight);
+			marchSquaresProgram.setColor(obstacleColor);
+			marchSquaresProgram.setTranslation(3.0, 2.0);
+			marchSquaresProgram.setScale(scene.obstacleRadius + fluid.particleRadius);
+			
+			posLoc = marchSquaresProgram.attrPosition;
+			gl.enableVertexAttribArray(posLoc);
+			gl.bindBuffer(gl.ARRAY_BUFFER, marchSquareVertBuffer);
+			gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+			
+			gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, marchSquareIdBuffer);
+			gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0); // 6 indices for 2 triangles
+			
+			gl.disableVertexAttribArray(posLoc);
+		}
+
+		// --------------------------------------------------------------
+
+		// if (gridVertBuffer == null) {
+		// 	var f = fluid;
+		// 	gridVertBuffer = gl.createBuffer();
+		// 	var cellCenters = new Float32Array(2 * f.fNumCells);
+		// 	var p = 0;
+
+		// 	for (var i = 0; i < f.fNumX; i++) {
+		// 		for (var j = 0; j < f.fNumY; j++) {
+		// 			cellCenters[p++] = (i + 0.5) * f.h;
+		// 			cellCenters[p++] = (j + 0.5) * f.h;
+		// 		}
+		// 	}
+		// 	gl.bindBuffer(gl.ARRAY_BUFFER, gridVertBuffer);
+		// 	gl.bufferData(gl.ARRAY_BUFFER, cellCenters, gl.DYNAMIC_DRAW);
+		// 	gl.bindBuffer(gl.ARRAY_BUFFER, null);
+		// }
+
+		// if (gridColorBuffer == null)
+		// 	gridColorBuffer = gl.createBuffer();
+
+		// if (scene.showMarchingSquares) {
+
+		// 	var pointSize = 0.9 * fluid.h / simWidth * canvas.width;
+
+		// 	// set uniforms and attributes
+		// 	pointShaderProgram.use();
+		// 	pointShaderProgram.setDomainSize(simWidth, simHeight);
+		// 	pointShaderProgram.setPointSize(pointSize);
+		// 	pointShaderProgram.setDrawObstacle(0.0);
+
+		// 	gl.bindBuffer(gl.ARRAY_BUFFER, gridVertBuffer);
+		// 	var posLoc = pointShaderProgram.attrPosition;
+		// 	gl.enableVertexAttribArray(posLoc);
+		// 	gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+
+		// 	gl.bindBuffer(gl.ARRAY_BUFFER, gridColorBuffer);
+		// 	gl.bufferData(gl.ARRAY_BUFFER, fluid.cellColor, gl.DYNAMIC_DRAW);
+
+		// 	var colorLoc = pointShaderProgram.attrColor;
+		// 	gl.enableVertexAttribArray(colorLoc);
+		// 	gl.vertexAttribPointer(colorLoc, 3, gl.FLOAT, false, 0, 0);
+
+		// 	// Bind the index buffer and draw the triangles
+		// 	var indices = [];
+		// 	for (var i = 0; i < fluid.fNumCells; i++) {
+		// 		indices.push(i);
+		// 	}
+			
+		// 	var indexBuffer = gl.createBuffer();
+		// 	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+		// 	gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
+
+		// 	gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
+
+		// 	gl.disableVertexAttribArray(posLoc);
+		// 	gl.disableVertexAttribArray(colorLoc);
+
+		// 	gl.bindBuffer(gl.ARRAY_BUFFER, null);
+		// 	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+		// }
+
+		// --------------------------------------------------------------
+
+		// var indices = []; 
+
+		// // marching squares 
+		// if (marchSquareVertBuffer == null) {
+		// 	var f = fluid;
+		// 	marchSquareVertBuffer = gl.createBuffer();
+		// 	var cellVertices = [];
+
+		// 	// indices 
+		// 	indices = []; 
+		// 	var indexOffset = 0;
+			
+		// 	for (var i = 0; i < f.fNumX; i++) {
+		// 		for (var j = 0; j < f.fNumY; j++) {
+		// 			// Calculate the four vertices of the cell
+		// 			var x0 = (i) * f.h;
+		// 			var y0 = (j) * f.h;
+		// 			var x1 = (i + 1) * f.h;
+		// 			var y1 = (j) * f.h;
+		// 			var x2 = (i + 1) * f.h;
+		// 			var y2 = (j + 1) * f.h;
+		// 			var x3 = (i) * f.h;
+		// 			var y3 = (j + 1) * f.h;
+					
+		// 			// Add the vertices to the cellVertices array
+		// 			cellVertices.push(x0, y0, x1, y1, x2, y2, x2, y2, x3, y3, x0, y0);
+
+		// 			// Add the indices for the two triangles of the cell
+		// 			indices.push(indexOffset, indexOffset + 1, indexOffset + 2, indexOffset + 2, indexOffset + 3, indexOffset);
+		// 			indexOffset += 4; // Increment by 4 for the next cell
+		// 		}
+		// 	}
+			
+		// 	// vertices 
+		// 	gl.bindBuffer(gl.ARRAY_BUFFER, marchSquareVertBuffer);
+		// 	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(cellVertices), gl.DYNAMIC_DRAW);
+		// 	gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+		// 	// Create and bind the index buffer
+		// 	marchSquareIdBuffer = gl.createBuffer();
+		// 	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, marchSquareIdBuffer);
+		// 	gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
+		// 	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+		// }
+
+		// if (marchSquareColorBuffer == null)
+		// 	marchSquareColorBuffer = gl.createBuffer();
+
+		// if (scene.showMarchingSquares) {
+
+		// 	var pointSize = 0.9 * fluid.h / simWidth * canvas.width;
+
+		// 	// set uniforms and attributes
+		// 	marchSquaresProgram.use();
+		// 	marchSquaresProgram.setDomainSize(simWidth, simHeight);
+		// 	marchSquaresProgram.setPointSize(pointSize);
+		// 	marchSquaresProgram.setDrawObstacle(0.0);
+
+		// 	gl.bindBuffer(gl.ARRAY_BUFFER, marchSquareVertBuffer);
+		// 	var posLoc = marchSquaresProgram.attrPosition;
+		// 	gl.enableVertexAttribArray(posLoc);
+		// 	gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+
+		// 	gl.bindBuffer(gl.ARRAY_BUFFER, marchSquareColorBuffer);
+		// 	gl.bufferData(gl.ARRAY_BUFFER, fluid.cellColor, gl.DYNAMIC_DRAW);
+
+		// 	var colorLoc = marchSquaresProgram.attrColor;
+		// 	gl.enableVertexAttribArray(colorLoc);
+		// 	gl.vertexAttribPointer(colorLoc, 3, gl.FLOAT, false, 0, 0);
+
+		// 	// Bind the index buffer and draw the grid using triangles
+		// 	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, marchSquareIdBuffer);
+		// 	gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
+
+		// 	gl.disableVertexAttribArray(posLoc);
+		// 	gl.disableVertexAttribArray(colorLoc);
+
+		// 	gl.bindBuffer(gl.ARRAY_BUFFER, null);
+		// 	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+		// }
+
+
+		// --------------------------------------------------------------
+		// // marching cubes 
+		// // Render the polygon defined by the intersection points
+		// if (scene.showMarchingSquares) { 
+		// 	// create marching squares 
+		// 	marchingSquares.createMarchingSquares();
+
+		// 	// Render the polygon using WebGL
+		// 	// You can render filled polygons or just the outlines
+
+		// 	let intersections = marchingSquares.intersections; 
+		// 	if (intersections.length < 3) {
+		// 		// Not enough intersections to form a polygon
+		// 		return;
+		// 	}
+			
+		// 	// Flatten the intersection points array
+		// 	let vertices = [];
+		// 	for (let i = 0; i < intersections.length; i++) {
+		// 		vertices.push(intersections[i][0], intersections[i][1]);
+		// 	}
+
+		// 	// Create a WebGL buffer for the vertices
+		// 	let vertexBuffer = gl.createBuffer();
+		// 	gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+		// 	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+		
+		// 	// Define the vertex shader
+		// 	let vertexShaderCode = `
+		// 		attribute vec2 position;
+		// 		void main() {
+		// 			gl_Position = vec4(position, 0.0, 1.0);
+		// 		}
+		// 	`;
+		// 	let vertexShader = gl.createShader(gl.VERTEX_SHADER) as WebGLShader;
+			
+		// 	// Check if the vertex shader compiled successfully
+		// 	if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
+		// 		console.error('An error occurred compiling the vertex shader:', gl.getShaderInfoLog(vertexShader));
+		// 		return;
+		// 	}
+
+		// 	gl.shaderSource(vertexShader, vertexShaderCode);
+		// 	gl.compileShader(vertexShader);
+
+		// 	// Define the fragment shader
+		// 	let fragmentShaderCode = `
+		// 		precision mediump float;
+		// 		void main() {
+		// 			gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0); // White color
+		// 		}
+		// 	`;
+		// 	let fragmentShader = gl.createShader(gl.FRAGMENT_SHADER) as WebGLShader;
+			
+		// 	// Check if the vertex shader compiled successfully
+		// 	if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
+		// 		console.error('An error occurred compiling the fragment shader:', gl.getShaderInfoLog(fragmentShader));
+		// 		return;
+		// 	}
+
+		// 	gl.shaderSource(fragmentShader, fragmentShaderCode);
+		// 	gl.compileShader(fragmentShader);
+		
+		// 	// Create the shader program
+		// 	let shaderProgram = gl.createProgram() as WebGLProgram;
+		// 	gl.attachShader(shaderProgram, vertexShader);
+		// 	gl.attachShader(shaderProgram, fragmentShader);
+		// 	gl.linkProgram(shaderProgram);
+		// 	gl.useProgram(shaderProgram);
+		
+		// 	// Bind the vertex buffer to the shader program
+		// 	let positionAttribLocation = gl.getAttribLocation(shaderProgram, 'position');
+		// 	gl.enableVertexAttribArray(positionAttribLocation);
+		// 	gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+		// 	gl.vertexAttribPointer(positionAttribLocation, 2, gl.FLOAT, false, 0, 0);
+		
+		// 	// Draw the polygon
+		// 	gl.drawArrays(gl.TRIANGLE_FAN, 0, intersections.length);
+		
+		// 	// Clean up
+		// 	gl.disableVertexAttribArray(positionAttribLocation);
+		// 	gl.deleteShader(vertexShader);
+		// 	gl.deleteShader(fragmentShader);
+		// 	gl.deleteProgram(shaderProgram);
+		// 	gl.deleteBuffer(vertexBuffer);
+
+		// }
+ 						
+		// --------------------------------------------------------------
+
+		// // marching cubes 
+		// if (marchSquareVertBuffer == null) {
+		// 	var f = fluid;
+		// 	marchSquareVertBuffer = gl.createBuffer();
+			
+		// 	// Use marching squares algorithm to generate vertices and edges
+		// 	marchingSquares.marchingSquaresAlgo(f.cellType, f.fNumY, f.fNumX, f.h, f.fInvSpacing); 
+
+		// 	gl.bindBuffer(gl.ARRAY_BUFFER, marchSquareVertBuffer);
+		// 	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(marchingSquares.vertices), gl.DYNAMIC_DRAW);
+		// 	gl.bindBuffer(gl.ARRAY_BUFFER, null);
+		// }
+
+		// if (scene.showMarchingSquares) { 
+		// 	marchingSquares.marchingSquaresAlgo(fluid.cellType, fluid.fNumY, fluid.fNumX, fluid.h, fluid.fInvSpacing);
+
+		// 	var pointSize = 0.9 * fluid.h / simWidth * canvas.width;
+
+		// 	// set uniforms and attributes
+		// 	marchSquaresProgram.use();
+		// 	marchSquaresProgram.setDomainSize(simWidth, simHeight);
+		// 	marchSquaresProgram.setPointSize(pointSize);
+		
+		// 	gl.bindBuffer(gl.ARRAY_BUFFER, marchSquareVertBuffer);
+		// 	var posLoc = marchSquaresProgram.attrPosition;
+		// 	gl.enableVertexAttribArray(posLoc);
+		// 	gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+		
+		// 	// // Render edges of the marching squares
+		// 	// for (let i = 0; i < marchingSquares.edges.length; i += 2) {
+		// 	// 	gl.drawArrays(gl.LINE_LOOP, marchingSquares.edges[i], marchingSquares.edges[i + 1]);
+		// 	// }
+
+		// 	// Create and bind the index buffer
+		// 	const indexBuffer = gl.createBuffer();
+		// 	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+		// 	gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(marchingSquares.edges), gl.STATIC_DRAW);
+
+		// 	// Render edges of the marching squares
+		// 	gl.drawElements(gl.LINES, marchingSquares.edges.length, gl.UNSIGNED_SHORT, 0);
+
+		// 	// Render boundary as filled geometry (assuming no indices, just draw all vertices as triangles)
+		// 	gl.drawArrays(gl.TRIANGLES, 0, marchingSquares.vertices.length / 2);
+
+		// 	gl.disableVertexAttribArray(posLoc);
+
+		// 	gl.bindBuffer(gl.ARRAY_BUFFER, null);
+		// }
+
+		// --------------------------------------------------------------
 
 		// water
 
@@ -446,6 +929,7 @@ function main() {
 		gl.drawElements(gl.TRIANGLES, 3 * numSegs, gl.UNSIGNED_SHORT, 0);
 
 		gl.disableVertexAttribArray(posLoc);		
+
 		
 	}
 
@@ -529,6 +1013,7 @@ function main() {
 			fluid.colorDensity = controls['Density Display'];
 			scene.showParticles = controls['Particle'];
 			scene.showGrid = controls['Grid'];
+			scene.showMarchingSquares = controls['Marching Squares Display'];
 			scene.compensateDrift = controls['Compensate Drift'];
 			scene.separateParticles = controls['Separate Particles'];
 			scene.flipRatio = controls['PIC - FLIP Ratio'];

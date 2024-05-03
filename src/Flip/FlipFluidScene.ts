@@ -21,6 +21,7 @@ export class FlipFluidScene {
 	obstacleVelY: number;
 	showParticles: boolean;
 	showGrid: boolean;
+	showMarchingSquares: boolean;
 
 	constructor() {
 		this.gravity = -9.81;
@@ -41,6 +42,7 @@ export class FlipFluidScene {
 		this.obstacleVelY = 0.0;
 		this.showParticles = true;
 		this.showGrid = false;
+		this.showMarchingSquares = false;
 	}
 }
 

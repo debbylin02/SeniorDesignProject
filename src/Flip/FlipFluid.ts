@@ -54,7 +54,6 @@ export class FlipFluid {
 	colorDensity: boolean;
 	baseColor: vec3;
 
-
 	constructor(density: number, width: number, height: number, spacing: number, particleRadius: number, maxParticles: number | Iterable<number>) {
 
 		// fluid
@@ -483,25 +482,30 @@ export class FlipFluid {
 		}
 	}
 
-	solveIncompressibility(numIters: number, dt: number, overRelaxation: number, compensateDrift = true) {
-
+	solveIncompressibility(numIters: number, dt: number, overRelaxation: number, compensateDrift = true) 
+	{
+		// Reset pressure field
 		this.p.fill(0.0);
+		
+		// Store previous velocity values
 		this.prevU.set(this.u);
 		this.prevV.set(this.v);
 
 		var n = this.fNumY;
 		var cp = this.density * this.h / dt;
 
+		// Iterate over each cell in the grid
 		for (var i = 0; i < this.fNumCells; i++) {
 			var u = this.u[i];
 			var v = this.v[i];
 		}
 
+		// Perform the incompressibility solve for a specified number of iterations
 		for (var iter = 0; iter < numIters; iter++) {
-
+			// Iterate over each cell in the grid (excluding boundary cells)
 			for (var i = 1; i < this.fNumX-1; i++) {
 				for (var j = 1; j < this.fNumY-1; j++) {
-
+					// Check if the cell is a fluid cell
 					if (this.cellType[i*n + j] != CellType.FLUID_CELL)
 						continue;
 
@@ -511,6 +515,7 @@ export class FlipFluid {
 					var bottom = i * n + j - 1;
 					var top = i * n + j + 1;
 
+					// Calculate the sum of pressure values of neighboring cells
 					var s = this.s[center];
 					var sx0 = this.s[left];
 					var sx1 = this.s[right];
@@ -520,9 +525,10 @@ export class FlipFluid {
 					if (s == 0.0)
 						continue;
 
-					var div = this.u[right] - this.u[center] + 
-						this.v[top] - this.v[center];
+					// Calculate the divergence of velocity at the cell
+					var div = this.u[right] - this.u[center] + this.v[top] - this.v[center];
 
+					// Compensate for particle drift if enabled
 					if (this.particleRestDensity > 0.0 && compensateDrift) {
 						// k = stiffness coefficient 
 						var k = 1.0;
@@ -531,10 +537,12 @@ export class FlipFluid {
 							div = div - k * compression;
 					}
 
+					// Calculate the pressure value at the cell
 					var p = -div / s;
 					p *= overRelaxation;
 					this.p[center] += cp * p;
 
+					// Update the velocity values based on the pressure gradient
 					this.u[center] -= sx0 * p;
 					this.u[right] += sx1 * p;
 					this.v[center] -= sy0 * p;
@@ -544,6 +552,8 @@ export class FlipFluid {
 		}
 	}
 
+	
+	// ----------------- coloring -----------------------------
 	updateParticleColors() 
 	{
 		// set all particles to blue
@@ -633,6 +643,8 @@ export class FlipFluid {
 			}
 		}
 	}
+
+
 
 	
 	clip(value: number, min: number, max: number): number {
