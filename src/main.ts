@@ -1,22 +1,30 @@
-import { vec3 } from 'gl-matrix';
+import { vec2, vec3 } from 'gl-matrix';
 import { FlipFluid } from './Flip/FlipFluid';
 import { FlipFluidScene } from './Flip/FlipFluidScene';
 const Stats = require('stats-js');
 import * as DAT from 'dat.gui';
 import ShaderProgram, { Shader } from './rendering/gl/ShaderProgram';
 import { setGL } from './globals';
+import { FluidSim, createFluidSim } from './Eulerian/FluidSim';
 
+let usingWebgl = true; 
+let eulerianFluidSim: FluidSim; 
 let scene = new FlipFluidScene();
 let fluid : FlipFluid; 
 let simHeight: number;;	
 let cScale: number;
 let simWidth: number;
-let canvas: HTMLCanvasElement;
+
+let webglCanvas: HTMLCanvasElement;
+let canvas2dCanvas: HTMLCanvasElement; 
+
 let gl: WebGL2RenderingContext;
+let canvasCtxt: CanvasRenderingContext2D;
 
 let resolutionChanged = false;
 let oldResolution: number = 100; 
 let currResolution: number = 100; 
+
 
 // GUI controls 
 const controls = {
@@ -34,6 +42,7 @@ const controls = {
 'PIC - FLIP Ratio': 0.9,
 'Fluid color' : [0, 0, 255, 1],
 'Play simulation': false, 
+'Choose Scene': 'PIC - FLIP',
 // 'Play simulation': toggleStart,
 };
 
@@ -41,8 +50,8 @@ const controls = {
 let gui = new DAT.GUI();
 // Add controls to the gui
 gui.add(controls, 'Load Scene');
-gui.add(controls, 'Obstacle radius', 0.05, 0.2).step(0.005);   
-gui.add(controls, 'Resolution', 10, 200).step(10).onChange(() => { 
+gui.add(controls, 'Obstacle radius', 0.05, 0.4).step(0.01);   
+gui.add(controls, 'Resolution', 20, 200).step(10).onChange(() => { 
 	oldResolution = currResolution; 		// store previous resolution
 	currResolution = controls['Resolution']; // store previous resolution 
 	resolutionChanged = true; 				// set resolutionChanged to true
@@ -56,7 +65,12 @@ gui.add(controls, 'Compensate Drift');
 gui.add(controls, 'Separate Particles');
 gui.add(controls, 'PIC - FLIP Ratio', 0.0, 1.0).step(0.1);
 gui.addColor(controls, 'Fluid color'); 
+// add dropdown menu
+gui.add(controls, 'Choose Scene', [ 'PIC - FLIP', 'Eulerian' ] ).onChange(() => {
+	usingWebgl = !usingWebgl;
+});
 gui.add(controls, 'Play simulation');
+
 
 
 // -------- Buffers for drawing --------------------- 
@@ -70,6 +84,31 @@ var obstacleVertBuffer: WebGLBuffer | null = null;
 var obstacleIdBuffer: WebGLBuffer | null = null;
 
 // --------------------------------------------------------------
+// Render function
+function render() {
+    // Clear canvas
+	if (usingWebgl) { 
+		gl.clear(gl.COLOR_BUFFER_BIT);
+		gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+		
+		// Render the scene for PIC - FLIP on webglCanvas
+		// renderPICFLIPScene();
+
+	} else {
+		canvasCtxt.clearRect(0, 0, canvas2dCanvas.width, canvas2dCanvas.height);
+		canvasCtxt.fillStyle = 'white';
+		canvasCtxt.fillRect(0, 0, canvas2dCanvas.width, canvas2dCanvas.height);
+
+		// Render the scene for Eulerian on canvas2dCanvas
+        // renderEulerianScene();
+	}
+
+
+    // Request next frame
+    requestAnimationFrame(render);
+}
+
+
 
 function resetGl() {
 	// clear gl/reset viewport 
@@ -196,8 +235,8 @@ function setupScene()
 	let baseResolution = 100;
 
 	simHeight = 3.0 * (baseResolution / res);
-	cScale = canvas.height / simHeight;
-	simWidth = canvas.width / cScale;
+	cScale = webglCanvas.height / simHeight;
+	simWidth = webglCanvas.width / cScale;
 
 
 	// need to adjusting for resolution
@@ -253,14 +292,31 @@ function setupScene()
 	setObstacle(3.0, 2.0, true);
 }
 
+function createEulerianFluidSim() { 
+	eulerianFluidSim = createFluidSim({
+		initialScene: 'Wind Scene',
+		canvasDomId: 'canvas2d-canvas',
+		buttonsDomId: 'inputDiv',
+		canvasSize: vec2.fromValues(window.innerWidth - 80, window.innerHeight - 270),
+		resolutionOverride: undefined,
+		autostart: true,
+	});
+}
+
 function main() {
 			
 	// get canvas and webgl context
-	canvas = <HTMLCanvasElement> document.getElementById('canvas');
-	gl = <WebGL2RenderingContext> canvas.getContext('webgl2');
+	webglCanvas = <HTMLCanvasElement> document.getElementById('webgl-canvas');
+	gl = <WebGL2RenderingContext> webglCanvas.getContext('webgl2');
 
 	if (!gl) {
 		alert('WebGL 2 not supported!');
+	}
+
+	canvas2dCanvas = <HTMLCanvasElement> document.getElementById('canvas2d-canvas');
+	canvasCtxt = <CanvasRenderingContext2D> canvas2dCanvas.getContext('2d');
+	if (!canvasCtxt) {
+		alert('2D Canvas not supported!');
 	}
 
 	// `setGL` is a function imported above which sets the value of `gl` in the `globals.ts` module.
@@ -268,9 +324,13 @@ function main() {
 	setGL(gl);
 	  
 
-	canvas.width = window.innerWidth - 20;
-	canvas.height = window.innerHeight - 20;
-	canvas.focus();
+	// webglCanvas.width = window.innerWidth - 20;
+	// webglCanvas.height = window.innerHeight - 20;
+	
+	webglCanvas.width = 0; 
+	webglCanvas.height = 0;
+	
+	// webglCanvas.focus();
 
 	// Initial display for framerate
 	
@@ -325,7 +385,7 @@ function main() {
 
 		if (scene.showGrid) {
 
-			var pointSize = 0.9 * fluid.h / simWidth * canvas.width;
+			var pointSize = 0.9 * fluid.h / simWidth * webglCanvas.width;
 
 			// set uniforms and attributes
 			pointShaderProgram.use();
@@ -358,7 +418,7 @@ function main() {
 		if (scene.showParticles) {
 			gl.clear(gl.DEPTH_BUFFER_BIT);
 
-			var pointSize = 2.0 * fluid.particleRadius / simWidth * canvas.width;
+			var pointSize = 2.0 * fluid.particleRadius / simWidth * webglCanvas.width;
 
 			// set uniforms and attributes
 			pointShaderProgram.use();
@@ -454,14 +514,14 @@ function main() {
 	var mouseDown = false;
 
 	function startDrag(x: number, y: number) {
-		let bounds = canvas.getBoundingClientRect();
+		let bounds = webglCanvas.getBoundingClientRect();
 
-		let mx = x - bounds.left - canvas.clientLeft;
-		let my = y - bounds.top - canvas.clientTop;
+		let mx = x - bounds.left - webglCanvas.clientLeft;
+		let my = y - bounds.top - webglCanvas.clientTop;
 		mouseDown = true;
 
 		x = mx / cScale;
-		y = (canvas.height - my) / cScale;
+		y = (webglCanvas.height - my) / cScale;
 
 		setObstacle(x,y, true);
 		scene.paused = false;
@@ -469,11 +529,11 @@ function main() {
 
 	function drag(x: number, y: number) {
 		if (mouseDown) {
-			let bounds = canvas.getBoundingClientRect();
-			let mx = x - bounds.left - canvas.clientLeft;
-			let my = y - bounds.top - canvas.clientTop;
+			let bounds = webglCanvas.getBoundingClientRect();
+			let mx = x - bounds.left - webglCanvas.clientLeft;
+			let my = y - bounds.top - webglCanvas.clientTop;
 			x = mx / cScale;
-			y = (canvas.height - my) / cScale;
+			y = (webglCanvas.height - my) / cScale;
 			setObstacle(x,y, false);
 		}
 	}
@@ -485,27 +545,27 @@ function main() {
 	}
 
 	// -------------------------- event listeners ---------------------------
-	canvas.addEventListener('mousedown', event => {
+	webglCanvas.addEventListener('mousedown', event => {
 		startDrag(event.x, event.y);
 	});
 
-	canvas.addEventListener('mouseup', event => {
+	webglCanvas.addEventListener('mouseup', event => {
 		endDrag();
 	});
 
-	canvas.addEventListener('mousemove', event => {
+	webglCanvas.addEventListener('mousemove', event => {
 		drag(event.x, event.y);
 	});
 
-	canvas.addEventListener('touchstart', event => {
+	webglCanvas.addEventListener('touchstart', event => {
 		startDrag(event.touches[0].clientX, event.touches[0].clientY)
 	});
 
-	canvas.addEventListener('touchend', event => {
+	webglCanvas.addEventListener('touchend', event => {
 		endDrag()
 	});
 
-	canvas.addEventListener('touchmove', event => {
+	webglCanvas.addEventListener('touchmove', event => {
 		event.preventDefault();
 		event.stopImmediatePropagation();
 		drag(event.touches[0].clientX, event.touches[0].clientY)
@@ -546,19 +606,38 @@ function main() {
 	}
 
 	function update() {
-		stats.begin();
-		simulate();
 
-		// gl.viewport(0, 0, window.innerWidth, window.innerHeight); 
+		if (controls['Choose Scene'] == 'PIC - FLIP') { 
+			webglCanvas.width = window.innerWidth - 20;
+			webglCanvas.height = window.innerHeight - 20;
+
+			stats.begin();
+			simulate();
+
+			// gl.viewport(0, 0, window.innerWidth, window.innerHeight); 
+			
+			draw();
+			stats.end();
+			requestAnimationFrame(update);
+
+		} else {
+			// webglCanvas.width = 0;
+			// webglCanvas.height = 0;
+			createEulerianFluidSim(); 
+		}
+
+		
 		  
-		draw();
-		stats.end();
-		requestAnimationFrame(update);
+
+		
+		  
+
+		
 	}
 
 	// --------------------------------------------------------------
 	// call functions 
-	setupScene();
+	// setupScene();
 	update();
 		
 }	

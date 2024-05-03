@@ -125,6 +125,8 @@ export function createFluidSim(options: {
     initialScene,
     fluidSim
   );
+
+  return fluidSim; 
 }
 
 function appendInputs(
