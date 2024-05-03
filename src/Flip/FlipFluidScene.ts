@@ -1,24 +1,28 @@
-// import { FlipFluid } from "./FlipFluid";
-
 export class FlipFluidScene {
 
 	// class variables 
-	gravity: number;
-	dt: number;
-	flipRatio: number;
-	numPressureIters: number;
-	numParticleIters: number;
-	frameNr: number;
-	overRelaxation: number;
-	compensateDrift: boolean;
-	separateParticles: boolean;
-	obstacleX: number;
-	obstacleY: number;
-	obstacleRadius: number;
-	paused: boolean;
+	
+	gravity: number;	// Gravity value in m/s^2
+	dt: number;			// Time step 
+	flipRatio: number;	// Ratio of FLIP to PIC blending - used to blend velocities 
+	
+	numPressureIters: number;	// Number of pressure solver iterations
+	numParticleIters: number;	// Number of particle solver iterations
+	frameNr: number;			// Current frame number
+	
+	overRelaxation: number;		// Over-relaxation factor for pressure solver
+	compensateDrift: boolean;	// Compensate drift is used to prevent particles from drifting away
+	separateParticles: boolean;	// Flag to indicate if particles should be separated
+	
+	obstacleX: number;			// X-coordinate of obstacle position
+	obstacleY: number;			// Y-coordinate of obstacle position
+	obstacleVelX: number;		// X-velocity of obstacle 
+	obstacleVelY: number;		// Y-velocity of obstacle  
+	obstacleRadius: number;		// Radius of obstacle 
+	
+	// simulation booleans
+	paused: boolean;	 
 	showObstacle: boolean;
-	obstacleVelX: number;
-	obstacleVelY: number;
 	showParticles: boolean;
 	showGrid: boolean;
 

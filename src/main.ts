@@ -24,9 +24,9 @@ const controls = {
 'Obstacle radius' : 0.1,
 'Resolution' : 100,
 'Gravity': -9.81,
-// 'Streamlines': true,
 'Speed Display': false,
 'Density Display': true,
+'Pressure Display': false,
 'Particle': true,
 'Grid': false,
 'Compensate Drift': true,
@@ -34,7 +34,6 @@ const controls = {
 'PIC - FLIP Ratio': 0.9,
 'Fluid color' : [0, 0, 255, 1],
 'Play simulation': false, 
-// 'Play simulation': toggleStart,
 };
 
 // Set up the GUI
@@ -47,9 +46,10 @@ gui.add(controls, 'Resolution', 10, 200).step(10).onChange(() => {
 	currResolution = controls['Resolution']; // store previous resolution 
 	resolutionChanged = true; 				// set resolutionChanged to true
 	setupScene();});						// call setupScene
-gui.add(controls, 'Gravity', -15.00, -8.0).step(0.01);
+gui.add(controls, 'Gravity', -15.00, 0.0).step(0.01);
 gui.add(controls, 'Speed Display');
 gui.add(controls, 'Density Display');
+gui.add(controls, 'Pressure Display');
 gui.add(controls, 'Particle');
 gui.add(controls, 'Grid');
 gui.add(controls, 'Compensate Drift');
@@ -110,7 +110,7 @@ function setObstacle(x: number, y: number, reset: boolean) {
 		// Calculate the new obstacle position based on the resolution change factor
 		scene.obstacleX *= resolutionFactor;
 		scene.obstacleY *= resolutionFactor;
-		// scene.obstacleRadius *= resolutionFactor;		 
+		scene.obstacleRadius *= resolutionFactor;		 
 
 		// --------------------------------------------------------------
 		var r = scene.obstacleRadius;
@@ -194,15 +194,10 @@ function setupScene()
 
 	// Calculate simHeight based on the ratio of the current resolution to the base resolution
 	let baseResolution = 100;
-
 	simHeight = 3.0 * (baseResolution / res);
 	cScale = canvas.height / simHeight;
 	simWidth = canvas.width / cScale;
 
-
-	// need to adjusting for resolution
-	// Adjust simHeight based on the resolution
-	// simHeight = 3.0 * (res / 100);
 	var tankHeight = 1.0 * simHeight;
 	var tankWidth = 1.0 * simWidth;
 	var h = tankHeight / (res);
@@ -354,7 +349,6 @@ function main() {
 		}
 
 		// water
-
 		if (scene.showParticles) {
 			gl.clear(gl.DEPTH_BUFFER_BIT);
 
@@ -428,7 +422,7 @@ function main() {
 
 		gl.clear(gl.DEPTH_BUFFER_BIT);
 
-		var obstacleColor = [1.0, 0.0, 0.0];
+		var obstacleColor = [1.0, 1.0, 1.0];
 
 		// set uniforms and attributes
 		meshShaderProgram.use();
@@ -527,6 +521,7 @@ function main() {
 		if (!scene.paused) {
 			fluid.colorVelocity = controls['Speed Display'];
 			fluid.colorDensity = controls['Density Display'];
+			fluid.colorPressure = controls['Pressure Display'];
 			scene.showParticles = controls['Particle'];
 			scene.showGrid = controls['Grid'];
 			scene.compensateDrift = controls['Compensate Drift'];

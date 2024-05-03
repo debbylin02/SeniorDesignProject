@@ -13,45 +13,54 @@ enum CellType {
 }
 
 export class FlipFluid {
-	density: any;
-	fNumX: number;
-	fNumY: number;
-	h: number;
-	fInvSpacing: number;
-	fNumCells: number;
-	u: Float32Array;
-	v: Float32Array;
-	du: Float32Array;
-	dv: Float32Array;
-	prevU: Float32Array;
-	prevV: Float32Array;
-	p: Float32Array;
-	s: Float32Array;
-	cellType: Int32Array;
-	cellColor: Float32Array;
-	maxParticles: any;
-	particlePos: Float32Array;
-	particleColor: Float32Array;
-	particleVel: Float32Array;
-	particleDensity: Float32Array;
-	particleRestDensity: number;
-	particleRadius: any;
-	pInvSpacing: number;
-	pNumX: number;
-	pNumY: number;
-	pNumCells: number;
-	numCellParticles: Int32Array;
-	firstCellParticle: Int32Array;
-	cellParticleIds: Int32Array;
-	numParticles: number;
+	density: any; // Represents the density of the fluid
+
+	fNumX: number; // Represents the number of cells in the X direction for the fluid grid
+	fNumY: number; // Represents the number of cells in the Y direction for the fluid grid
+	h: number; // Represents the spacing between cells in the fluid grid
+	fInvSpacing: number; // Represents the inverse of the spacing between cells in the fluid grid
+	fNumCells: number; // Represents the total number of cells in the fluid grid
+
+	u: Float32Array; // Represents the horizontal velocity component of the fluid at each cell
+	v: Float32Array; // Represents the vertical velocity component of the fluid at each cell
+	du: Float32Array; // Represents the change in horizontal velocity component of the fluid at each cell
+	dv: Float32Array; // Represents the change in vertical velocity component of the fluid at each cell
+	prevU: Float32Array; // Represents the previous horizontal velocity component of the fluid at each cell
+	prevV: Float32Array; // Represents the previous vertical velocity component of the fluid at each cell
+
+	p: Float32Array; // Represents the pressure of the fluid at each cell
+	s: Float32Array; // Represents the source term for the fluid at each cell
+
+	cellType: Int32Array; // Represents the type of each cell in the fluid grid
+	cellColor: Float32Array; // Represents the color of each cell in the fluid grid
+
+	maxParticles: any; // Represents the maximum number of particles in the fluid simulation
+	particlePos: Float32Array; // Represents the position of each particle in the fluid simulation
+	particleColor: Float32Array; // Represents the color of each particle in the fluid simulation
+	particleVel: Float32Array; // Represents the velocity of each particle in the fluid simulation
+	particleDensity: Float32Array; // Represents the density of each particle in the fluid simulation
+	particleRestDensity: number; // Represents the rest density of each particle in the fluid simulation
+	particleRadius: any; // Represents the radius of each particle in the fluid simulation
+	pInvSpacing: number; // Represents the inverse of the spacing between particles in the fluid simulation
+	pNumX: number; // Represents the number of particles in the X direction for the particle grid
+	pNumY: number; // Represents the number of particles in the Y direction for the particle grid
+	pNumCells: number; // Represents the total number of cells in the particle grid
+
+	numCellParticles: Int32Array; // Represents the number of particles in each cell of the particle grid
+	firstCellParticle: Int32Array; // Represents the index of the first particle in each cell of the particle grid
+	cellParticleIds: Int32Array; // Represents the IDs of particles in each cell of the particle grid
+
+	numParticles: number; // Represents the total number of particles in the fluid simulation
 	
 	// from the scene obstacle 
 	obstacleVelX: number;
 	obstacleVelY: number;
 
-	// color based on velocity/density 
+	// color based on velocity/density/pressure
 	colorVelocity: boolean;
 	colorDensity: boolean;
+	colorPressure: boolean;
+
 	baseColor: vec3;
 
 
@@ -109,6 +118,7 @@ export class FlipFluid {
 
 		this.colorVelocity = false;
 		this.colorDensity = true;
+		this.colorPressure = false;
 	}
 
 	setObstacleVelocity(vx: number, vy: number) {
@@ -457,6 +467,7 @@ export class FlipFluid {
 							+ valid2 * d2 * (f[nr2] - prevF[nr2]) + valid3 * d3 * (f[nr3] - prevF[nr3])) / dVal;
 						var flipV = v + corr;
 
+						// use flip ratio to blend between PIC and FLIP velocities 
 						this.particleVel[2 * i + component] = (1.0 - flipRatio) * picV + flipRatio * flipV;
 					}
 				}
@@ -483,6 +494,7 @@ export class FlipFluid {
 		}
 	}
 
+	// overRelaxation is 
 	solveIncompressibility(numIters: number, dt: number, overRelaxation: number, compensateDrift = true) {
 
 		this.p.fill(0.0);
@@ -523,6 +535,7 @@ export class FlipFluid {
 					var div = this.u[right] - this.u[center] + 
 						this.v[top] - this.v[center];
 
+				
 					if (this.particleRestDensity > 0.0 && compensateDrift) {
 						// k = stiffness coefficient 
 						var k = 1.0;
@@ -556,7 +569,7 @@ export class FlipFluid {
 
 		// inverse grid spacing -> map particle to grid 
 		var h1 = this.fInvSpacing; 
-
+		 
 		for (var i = 0; i < this.numParticles; i++) {
 
 			// set particle color to base color
@@ -619,6 +632,48 @@ export class FlipFluid {
 					this.particleColor[3 * i + 2] = currentB + (targetB - currentB) * t;
 				}
 				
+				// ----- set particle color based on pressure -----
+				
+				if (this.colorPressure) {
+					var p0 = this.p[cellNr]; // Pressure value
+
+					// Define the base minimum and maximum pressure values
+					const baseMinP = 900.0;
+					const baseMaxP = 20000.0;
+					const baseNumParticles = 100000; 
+
+					// Calculate the scaling factor based on the number of particles
+					const scaleFactor = Math.sqrt(this.numParticles / baseNumParticles);
+
+					// Scale the minimum and maximum pressure values
+					const minP = baseMinP / scaleFactor;
+					const maxP = baseMaxP / scaleFactor;
+
+					let t = this.clamp(p0, minP, maxP);  
+
+					var color = this.getSciColorFromVal(t, minP, maxP);
+					 
+					this.particleColor[3 * i] = color[0] / 255;
+					this.particleColor[3 * i + 1] = color[1] / 255;
+					this.particleColor[3 * i + 2] = color[2] / 255;
+
+					// get current particle color
+					let currentR = this.particleColor[3 * i];
+					// let currentG = this.particleColor[3 * i + 1];
+					// let currentB = this.particleColor[3 * i + 2];
+
+					// // complimentary color v1 
+					// let targetR = 1.0 - currentR;
+					// let targetG = 1.0 - currentG;
+					// let targetB = 1.0 - currentB;
+			
+					// // Linearly interpolate between current color and target color based on t
+					// this.particleColor[3 * i]     = currentR + (targetR - currentR) * t;
+					// this.particleColor[3 * i + 1] = currentG + (targetG - currentG) * t;
+					// this.particleColor[3 * i + 2] = currentB + (targetB - currentB) * t;
+				}
+
+
 				// ----- Color based on densitiy -----
 				if (this.colorDensity) {
 					var relDensity = this.particleDensity[cellNr] / d0;
@@ -630,6 +685,7 @@ export class FlipFluid {
 						this.particleColor[3 * i + 2] = 1.0;
 					}
 				}
+
 			}
 		}
 	}
@@ -659,6 +715,42 @@ export class FlipFluid {
 		this.cellColor[3 * cellNr] = r as number;
 		this.cellColor[3 * cellNr + 1] = g as number;
 		this.cellColor[3 * cellNr + 2] = b as number;
+	}
+
+	// returns the color 
+	getSciColorFromVal(val: number, minVal: number, maxVal: number) {
+		val = Math.min(Math.max(val, minVal), maxVal - 0.0001);
+		const d = maxVal - minVal;
+		val = d == 0.0 ? 0.5 : (val - minVal) / d;
+		const m = 0.25;
+		const num = Math.floor(val / m);
+		const s = (val - num * m) / m;
+		let r: number, g: number, b: number;
+	  
+		switch (num) {
+		  case 0:
+			r = 0.0;
+			g = s;
+			b = 1.0;
+			break;
+		  case 1:
+			r = 0.0;
+			g = 1.0;
+			b = 1.0 - s;
+			break;
+		  case 2:
+			r = s;
+			g = 1.0;
+			b = 0.0;
+			break;
+		  case 3:
+			r = 1.0;
+			g = 1.0 - s;
+			b = 0.0;
+			break;
+		}
+	  
+		return [255 * r!, 255 * g!, 255 * b!, 255];
 	}
 
 	// compute cell color for fluid cells based on density 
