@@ -2,7 +2,7 @@
 
 ## Alpha Version  
 
-Implemented a 2D fluid simulation. I used a Eulerian Fluid Simulator that was originally developed by Ten Minute Physics as a reference and converted it into TypeScript as well as incorporated web-gl.
+Implemented a 2D fluid simulation. I used a Eulerian Fluid Simulator that was originally developed by Ten Minute Physics as a reference and converted it into TypeScript.
 - Ten Minute Physics Fluid Simulator: https://www.youtube.com/watch?v=iKAVRgIrUOU 
 
 ## Beta Version
