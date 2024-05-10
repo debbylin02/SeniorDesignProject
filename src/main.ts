@@ -555,6 +555,7 @@ function main() {
 	// call functions 
 	setupScene();
 	update();
+	
 		
 }	
 

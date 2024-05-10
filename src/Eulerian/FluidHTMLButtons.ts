@@ -74,20 +74,6 @@ export function inputsForScene(options: {
   );
 
   inputs.push(
-    // createSliderWithText(
-    //   {
-    //     initialValue: scene.overRelaxation,
-    //     min: 0.05,
-    //     max: 1.95,
-    //     stepSize: 0.05,
-    //     label: 'Over relaxation',
-    //     callbackOnlyOnPointerUp: false,
-    //   },
-    //   (val) => {
-    //     scene.overRelaxation = val;
-    //     onChangeOverrides({ overRelaxation: val });
-    //   }
-    // ),
     createSliderWithText(
       {
         initialValue: scene.fluid.numY,

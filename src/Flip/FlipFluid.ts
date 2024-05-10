@@ -536,6 +536,7 @@ export class FlipFluid {
 						this.v[top] - this.v[center];
 
 				
+					// if compensateDrift = true -> add drift compensation term
 					if (this.particleRestDensity > 0.0 && compensateDrift) {
 						// k = stiffness coefficient 
 						var k = 1.0;

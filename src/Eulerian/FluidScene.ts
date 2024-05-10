@@ -3,7 +3,6 @@ import {vec2} from 'gl-matrix';
 
 export type SceneTag =
   | 'Wind Scene'
-  | 'Paint Scene'
   | 'Tank Scene'
   | 'HiRes Scene';
 
@@ -46,12 +45,6 @@ function makeSceneConfig(tag: SceneTag): SceneConfig {
         showPressure: true,
         dt: 1 / 120,
         numIters: 100,
-      };
-    case 'Paint Scene':
-      return {
-        ...defaultSceneConfig,
-        overRelaxation: 0.4,
-        obstacleRadius: 0.03,
       };
     case 'Tank Scene':
       return {
@@ -159,14 +152,9 @@ export function setObstacle(
         // Set cell to solid
         f.s[i * n + j] = 0.0;
 
-        if (scene.tag === 'Paint Scene') {
-          // Set smoke to # based on time, between 0 & 1 inclusive
-          f.m[i * n + j] = 0.5 + 0.5 * Math.sin(0.1 * scene.frameNr);
-        } else {
-          // Set smoke to white
-          f.m[i * n + j] = 1.0;
-        }
-
+        // Set smoke to white
+        f.m[i * n + j] = 1.0;
+        
         // New velocity is how fast the obstacle moved since last frame
         f.u[i * n + j] = vx;
         f.u[(i + 1) * n + j] = vx;
