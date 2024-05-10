@@ -1,10 +1,11 @@
-import { vec3 } from 'gl-matrix';
+import { vec2, vec3 } from 'gl-matrix';
 import { FlipFluid } from './Flip/FlipFluid';
 import { FlipFluidScene } from './Flip/FlipFluidScene';
 const Stats = require('stats-js');
 import * as DAT from 'dat.gui';
 import ShaderProgram, { Shader } from './rendering/gl/ShaderProgram';
 import { setGL } from './globals';
+import { createFluidSim } from './Eulerian/FluidSim';
 
 let scene = new FlipFluidScene();
 let fluid : FlipFluid; 
@@ -69,8 +70,19 @@ var gridColorBuffer: WebGLBuffer | null = null;
 var obstacleVertBuffer: WebGLBuffer | null = null;
 var obstacleIdBuffer: WebGLBuffer | null = null;
 
-// --------------------------------------------------------------
+// ---------- Previous Eulerian Simulation -----------------------
+function createEulerianFluidSim() { 
+	let eulerianFluidSim = createFluidSim({
+		initialScene: 'Wind Scene',
+		canvasDomId: 'canvas',
+		buttonsDomId: 'inputDiv',
+		canvasSize: vec2.fromValues(window.innerWidth - 80, window.innerHeight - 270),
+		resolutionOverride: undefined,
+		autostart: true,
+	});
+}
 
+// --------------------------------------------------------------
 function resetGl() {
 	// clear gl/reset viewport 
 	gl.clearColor(0.0, 0.0, 0.0, 1.0);
@@ -249,6 +261,9 @@ function setupScene()
 }
 
 function main() {
+
+	// create Eulerian fluid simulation
+	// createEulerianFluidSim();
 			
 	// get canvas and webgl context
 	canvas = <HTMLCanvasElement> document.getElementById('canvas');
@@ -555,7 +570,6 @@ function main() {
 	// call functions 
 	setupScene();
 	update();
-	
 		
 }	
 

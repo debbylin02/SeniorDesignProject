@@ -16,7 +16,7 @@ const defaultSceneConfig = {
   dt: 1.0 / 60.0,
   gravity: 0,
   overRelaxation: 1.9,
-  smokeDissipation: 1.0,
+  fluidDissipation: 1.0,
   numIters: 20,
   frameNr: 0,
   resolution: 100,

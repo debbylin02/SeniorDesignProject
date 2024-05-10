@@ -24,9 +24,9 @@ export class FluidPhysics {
   newV: Float32Array; // Buffer for horizontal velocity
 
   p: Float32Array; // Pressure array 
-  s: Float32Array; // Solidness array -> 0 = solid, 1 = fluid
-  m: Float32Array; // Smoke density array -> 0 = black, 1 = white
-  newM: Float32Array; // Buffer for smoke density
+  s: Float32Array; // fluid vs solid marker-> 0 = solid, 1 = fluid
+  m: Float32Array; // fluid density array -> 0 = black, 1 = white
+  newM: Float32Array; // Buffer for fluid density
 
   constructor(
     density: number,
@@ -51,7 +51,7 @@ export class FluidPhysics {
     this.s = new Float32Array(this.numCells);
     this.m = new Float32Array(this.numCells);
 
-    // set smoke density buffer to 1.0 
+    // set fluid density buffer to 1.0 
     this.newM = new Float32Array(this.numCells);
     this.m.fill(1.0);
   }
@@ -258,9 +258,9 @@ export class FluidPhysics {
     this.v.set(this.newV);
   }
 
-  // Similar to advectVel, but for smoke density.
-  // New density is a weighted average of neighbouring smoke densities.
-  advectSmoke(dt: number, smokeDissipation: number) {
+  // Similar to advectVel, but for fluid density.
+  // New density is a weighted average of neighbouring fluid densities.
+  advectFluid(dt: number, fluidDissipation: number) {
     this.newM.set(this.m);
 
     const n = this.numY;
@@ -275,7 +275,7 @@ export class FluidPhysics {
           const x = i * h + h2 - dt * u;
           const y = j * h + h2 - dt * v;
           this.newM[i * n + j] =
-            this.sampleField(x, y, 'S_FIELD') * smokeDissipation;
+            this.sampleField(x, y, 'S_FIELD') * fluidDissipation;
         }
       }
     }
@@ -290,6 +290,6 @@ export class FluidPhysics {
 
     this.extrapolate();
     this.advectVel(dt);
-    this.advectSmoke(dt, s.smokeDissipation);
+    this.advectFluid(dt, s.fluidDissipation);
   }
 }

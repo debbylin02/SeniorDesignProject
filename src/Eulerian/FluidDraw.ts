@@ -65,13 +65,11 @@ export function draw(scene: Scene, cSize: vec2, c: CanvasRenderingContext2D) {
         }
       } else if (scene.showSmoke) {
         const s = f.m[i * n + j];
-        if (scene.tag === 'Paint Scene') {
-          color = getSciColor(s, 0.0, 1.0);
-        } else {
-          color[0] = 255 * s;
-          color[1] = 255 * s;
-          color[2] = 255 * s;
-        }
+       
+        color[0] = 255 * s;
+        color[1] = 255 * s;
+        color[2] = 255 * s;
+        
       } else {
         color = [255, 255, 255, 255];
       }
