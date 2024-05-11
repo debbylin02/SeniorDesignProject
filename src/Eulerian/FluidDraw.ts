@@ -58,18 +58,16 @@ export function draw(scene: Scene, cSize: vec2, c: CanvasRenderingContext2D) {
         const s = f.m[i * n + j];
 
         color = getSciColor(p, minP, maxP);
-        if (scene.showSmoke) {
+        if (scene.showFluid) {
           color[0] = Math.max(0.0, color[0] - 255 * s);
           color[1] = Math.max(0.0, color[1] - 255 * s);
           color[2] = Math.max(0.0, color[2] - 255 * s);
         }
-      } else if (scene.showSmoke) {
+      } else if (scene.showFluid) {
         const s = f.m[i * n + j];
-       
         color[0] = 255 * s;
         color[1] = 255 * s;
-        color[2] = 255 * s;
-        
+        color[2] = 255 * s;        
       } else {
         color = [255, 255, 255, 255];
       }
@@ -100,7 +98,7 @@ export function draw(scene: Scene, cSize: vec2, c: CanvasRenderingContext2D) {
   c.putImageData(id, 0, 0);
 
   if (scene.showVelocities) {
-    c.strokeStyle = scene.tag === 'HiRes Scene' ? '#AAAAAA' : '#000000';
+    c.strokeStyle = '#AAAAAA';
     const scale = 0.02;
 
     for (let i = 0; i < f.numX; i++) {
@@ -130,7 +128,6 @@ export function draw(scene: Scene, cSize: vec2, c: CanvasRenderingContext2D) {
   }
 
   if (scene.showStreamlines) {
-    // let segLen = f.h * 0.2;
     const numSegs = 15;
 
     c.strokeStyle = '#0099ff';
@@ -146,9 +143,6 @@ export function draw(scene: Scene, cSize: vec2, c: CanvasRenderingContext2D) {
         for (let n = 0; n < numSegs; n++) {
           const u = f.sampleField(x, y, 'U_FIELD');
           const v = f.sampleField(x, y, 'V_FIELD');
-          //const l = Math.sqrt(u * u + v * v);
-          // x += u/l * segLen;
-          // y += v/l * segLen;
           x += u * 0.01;
           y += v * 0.01;
           if (x > f.numX * f.h) break;

@@ -73,7 +73,6 @@ var obstacleIdBuffer: WebGLBuffer | null = null;
 // ---------- Previous Eulerian Simulation -----------------------
 function createEulerianFluidSim() { 
 	let eulerianFluidSim = createFluidSim({
-		initialScene: 'Wind Scene',
 		canvasDomId: 'canvas',
 		buttonsDomId: 'inputDiv',
 		canvasSize: vec2.fromValues(window.innerWidth - 80, window.innerHeight - 270),

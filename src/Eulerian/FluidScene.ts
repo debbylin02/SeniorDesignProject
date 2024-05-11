@@ -1,13 +1,7 @@
 import { FluidPhysics } from './FluidPhysics';
 import {vec2} from 'gl-matrix'; 
 
-export type SceneTag =
-  | 'Wind Scene'
-  | 'Tank Scene'
-  | 'HiRes Scene';
-
 export type Scene = {
-  tag: SceneTag;
   paused: boolean;
   fluid: FluidPhysics;
 } & SceneConfig;
@@ -30,35 +24,16 @@ const defaultSceneConfig = {
   showStreamlines: false,
   showVelocities: false,
   showPressure: false,
-  showSmoke: true,
+  showFluid: true,
   showSolid: false,
 };
 
 export type SceneConfig = typeof defaultSceneConfig;
 
-function makeSceneConfig(tag: SceneTag): SceneConfig {
-  switch (tag) {
-    case 'HiRes Scene':
-      return {
-        ...defaultSceneConfig,
-        resolution: 200,
-        showPressure: true,
-        dt: 1 / 120,
-        numIters: 100,
-      };
-    case 'Tank Scene':
-      return {
-        ...defaultSceneConfig,
-        gravity: -9.81,
-        resolution: 50,
-        showPressure: true,
-        showSmoke: false,
-      };
-    default:
-      return {
-        ...defaultSceneConfig,
-      };
-  }
+function makeSceneConfig(): SceneConfig {
+  return {
+    ...defaultSceneConfig,
+  };
 }
 
 function makeFluidPhysics(numY: number, canvasSize: vec2, drag: number) {
@@ -71,16 +46,14 @@ function makeFluidPhysics(numY: number, canvasSize: vec2, drag: number) {
 }
 
 export function makeScene(
-  tag: SceneTag,
   canvasSize: vec2,
   overrides: Partial<SceneConfig>
 ): Scene {
   const sceneConfig = {
-    ...makeSceneConfig(tag),
+    ...makeSceneConfig(),
     ...removeKeysWithUndefinedValues({ ...overrides }),
   };
   const scene: Scene = {
-    tag: tag,
     ...sceneConfig,
     paused: false,
     fluid: makeFluidPhysics(
@@ -93,28 +66,27 @@ export function makeScene(
   const f = scene.fluid;
   const n = f.numY;
 
-  if (tag === 'Wind Scene' || tag === 'HiRes Scene') {
-    for (let i = 0; i < f.numX; i++) {
-      for (let j = 0; j < f.numY; j++) {
-        const isSolid = i == 0 || j == 0 || j == f.numY - 1; // Left, bottom, top wall
-        f.s[i * n + j] = isSolid ? 0 : 1;
-      }
-    }
-
-    // Vortex shedding. Set horizontal velocity at column i = 1. i = 0 is left wall.
-    const inVel = 2;
+  for (let i = 0; i < f.numX; i++) {
     for (let j = 0; j < f.numY; j++) {
-      f.u[1 * n + j] = inVel;
+      const isSolid = i == 0 || j == 0 || j == f.numY - 1; // Left, bottom, top wall
+      f.s[i * n + j] = isSolid ? 0 : 1;
     }
-
-    // Short vertical column of black smoke at i = 0
-    const pipeH = 0.1 * f.numY;
-    const minJ = Math.floor(0.5 * f.numY - 0.5 * pipeH);
-    const maxJ = Math.floor(0.5 * f.numY + 0.5 * pipeH);
-    for (let j = minJ; j < maxJ; j++) f.m[j] = 0; // Black smoke = 0
-
-    setObstacle(scene, 0.4, 0.5, true, true);
   }
+
+  // Vortex shedding. Set horizontal velocity at column i = 1. i = 0 is left wall.
+  const inVel = 2;
+  for (let j = 0; j < f.numY; j++) {
+    f.u[1 * n + j] = inVel;
+  }
+
+  // Short vertical column of black smoke at i = 0
+  const pipeH = 0.1 * f.numY;
+  const minJ = Math.floor(0.5 * f.numY - 0.5 * pipeH);
+  const maxJ = Math.floor(0.5 * f.numY + 0.5 * pipeH);
+  for (let j = minJ; j < maxJ; j++) f.m[j] = 0; // Black smoke = 0
+
+  setObstacle(scene, 0.4, 0.5, true, true);
+
 
   return scene;
 }
@@ -152,9 +124,10 @@ export function setObstacle(
         // Set cell to solid
         f.s[i * n + j] = 0.0;
 
-        // Set smoke to white
+        // Set fluid to white
         f.m[i * n + j] = 1.0;
         
+
         // New velocity is how fast the obstacle moved since last frame
         f.u[i * n + j] = vx;
         f.u[(i + 1) * n + j] = vx;

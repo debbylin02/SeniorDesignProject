@@ -2,7 +2,8 @@
  "scripts": {
   "start": "parcel index.html --open",
   "build": "parcel build index.html",
-  "test": "jest"
+  "test": "jest",
+  "deploy": "gh-pages -d dist"
  },
  "devDependencies": {
   "@types/dat.gui": "^0.7.7",

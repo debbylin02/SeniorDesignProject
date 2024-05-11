@@ -4,7 +4,6 @@ import {
   makeScene,
   Scene,
   SceneConfig,
-  SceneTag,
   setObstacle,
 } from './FluidScene';
 
@@ -98,7 +97,6 @@ import {vec2} from 'gl-matrix';
 let overrides: Partial<SceneConfig> = {};
 
 export function createFluidSim(options: {
-  initialScene: SceneTag;
   canvasDomId: string;
   buttonsDomId: string;
   canvasSize: vec2;
@@ -108,7 +106,7 @@ export function createFluidSim(options: {
   overrides.resolution = options.resolutionOverride;
 
   const { canvasSize } = options;
-  const initialScene = makeScene(options.initialScene, canvasSize, overrides);
+  const initialScene = makeScene(canvasSize, overrides);
 
   const fluidCanvas = new Canvas(
     document.getElementById(options.canvasDomId) as HTMLCanvasElement,
@@ -150,11 +148,11 @@ function appendInputs(
     );
   };
 
-  const onChangeScene = (tag: SceneTag, clearOverrides: boolean) => {
+  const onChangeScene = (clearOverrides: boolean) => {
     if (clearOverrides) {
       overrides = {};
     }
-    const scene = makeScene(tag, canvasSize, overrides);
+    const scene = makeScene(canvasSize, overrides);
     setDiv(scene);
     fluidSim.setScene(scene);
   };

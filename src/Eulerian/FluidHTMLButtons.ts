@@ -1,4 +1,4 @@
-import { Scene, SceneConfig, SceneTag } from './FluidScene';
+import { Scene, SceneConfig } from './FluidScene';
 import { createSliderWithText } from '../Utils/HTMLSlider';
 
 export function inputsForScene(options: {
@@ -6,7 +6,7 @@ export function inputsForScene(options: {
   onPauseToggled: () => void;
   onObstacleChanged: () => void;
   onChangeOverrides: (newOverrides: Partial<SceneConfig>) => void;
-  onChangeScene: (tag: SceneTag, clearOverrides: boolean) => void;
+  onChangeScene: (clearOverrides: boolean) => void;
 }): (string | HTMLElement)[] {
   const {
     scene,
@@ -23,11 +23,8 @@ export function inputsForScene(options: {
       onPauseToggled();
     }),
     createButton('Clear', () => {
-      onChangeScene(scene.tag, false);
+      onChangeScene(false);
     }),
-    createButton('Reset scene', () => {
-      onChangeScene('Wind Scene', true);
-    })
   ];
 
   inputs.push(createBreak());
@@ -42,8 +39,8 @@ export function inputsForScene(options: {
     createCheckbox('Pressure', scene.showPressure, () => {
       scene.showPressure = !scene.showPressure;
     }),
-    createCheckbox('Fluid', scene.showSmoke, () => {
-      scene.showSmoke = !scene.showSmoke;
+    createCheckbox('Fluid', scene.showFluid, () => {
+      scene.showFluid = !scene.showFluid;
     }),
     createCheckbox('Obstacle', scene.showObstacle, () => {
       scene.showObstacle = !scene.showObstacle;
@@ -85,7 +82,7 @@ export function inputsForScene(options: {
       },
       (resolution) => {
         onChangeOverrides({ resolution });
-        onChangeScene(scene.tag, false);
+        onChangeScene(false);
       }
     ),
     `Shortcuts: 'P' for Pause/Start, 'M' for Step Next Frame`
