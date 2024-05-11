@@ -2,10 +2,9 @@
 
 ## Alpha Version  
 
-Implemented a 2D fluid simulation. I used a Eulerian Fluid Simulator that was originally developed by Ten Minute Physics as a reference and converted it into TypeScript.
-- Ten Minute Physics Fluid Simulator: https://www.youtube.com/watch?v=iKAVRgIrUOU 
+Implemented a 2D Eulerian fluid simulation.
 
 ## Beta Version
 
-Built off of alpha to create FLIP fluid simulation. 
+Built off of alpha to create PIC/FLIP fluid simulation. 
 
